@@ -1,0 +1,240 @@
+/* ====== Base ====== */
+body {
+  font-family: 'Inter', sans-serif;
+  background: #121212;
+  color: #E0E0E0;
+}
+
+/* ====== Sidebar ====== */
+.sidebar {
+  width: 280px;
+  background: #1A1A1A;
+  box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 12px 12px 0;
+}
+
+/* ====== Main ====== */
+.main-content {
+  flex-grow: 1;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-content {
+  display: none;
+  flex-grow: 1;
+}
+.tab-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-button.active {
+  background: #333;
+  color: #6366f1;
+  border-bottom: 2px solid #6366f1;
+}
+
+/* ====== Cards ====== */
+.card {
+  background: #1A1A1A;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+/* ====== Botones ====== */
+.btn {
+  padding: .75rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+.btn-primary {
+  background: #6366f1;
+  color: white;
+}
+.btn-primary:hover {
+  background: #4338ca;
+  transform: translateY(-2px);
+}
+.btn-secondary {
+  background: #333;
+  color: #E0E0E0;
+}
+.btn-secondary:hover {
+  background: #444;
+  transform: translateY(-2px);
+}
+
+/* ====== Inputs ====== */
+input[type=text],
+textarea,
+input[type=file] {
+  background: #242424;
+  color: #E0E0E0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: .75rem;
+}
+input[type=text]:focus,
+textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.5);
+}
+
+/* ====== Imagenes ====== */
+.item-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+.placeholder-image {
+  background: #242424;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #666;
+  font-size: 2rem;
+  height: 150px;
+}
+
+/* ====== Modales ====== */
+.modal-overlay {
+  position: fixed;
+  top: 8px; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s ease, visibility .25s ease;
+}
+.modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal {
+  position: fixed;
+top: 8px;
+left: 264.688px; /* Si este margen es necesario, mantenlo */
+right: 8px;       /* Añade un margen derecho para que se ajuste automáticamente */
+bottom: 8px;      /* Añade un margen inferior para limitar la altura */
+width: auto;      /* Se calculará automáticamente */
+height: auto;     /* Se calculará automáticamente */
+max-height: calc(100vh - 16px); /* Ajusta según los márgenes top + bottom */
+overflow: auto;   /* Para scroll si el contenido excede */
+
+  padding: 1rem;
+  box-sizing: border-box;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+}
+
+/* Layout del modal */
+.modal-header { flex: 0 0 auto; }
+.modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: .5rem;
+}
+.modal-footer {
+  flex: 0 0 auto;
+  margin-top: .75rem;
+}
+
+/* Descripción con scroll interno si es larga */
+#detailsDescription {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  color: #D1D5DB;
+}
+
+#detailsImageContainer {
+  max-height: 36vh;
+  overflow: hidden;
+  border-radius: 8px;
+  margin-bottom: .75rem;
+}
+#detailsImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ====== Scrollbar personalizado ====== */
+.modal-body::-webkit-scrollbar,
+#detailsDescription::-webkit-scrollbar {
+  width: 10px;
+}
+.modal-body::-webkit-scrollbar-thumb,
+#detailsDescription::-webkit-scrollbar-thumb {
+  background: rgba(99,102,241,0.2);
+  border-radius: 10px;
+}
+
+/* FIX: Contraste para el panel de manipulación de Vis.js */
+div.vis-manipulation, div.vis-edit-mode {
+    background: #2d3748 !important; /* Gris oscuro (slate-800) */
+    border: 1px solid #4a5568 !important; /* Gris medio (slate-700) */
+    color: #e2e8f0 !important; /* Texto claro (slate-200) */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+    border-radius: 8px !important;
+}
+div.vis-manipulation .vis-label {
+    color: #e2e8f0 !important; /* Texto claro */
+}
+div.vis-manipulation .vis-button {
+    color: #e2e8f0 !important;
+    background-color: transparent !important;
+}
+div.vis-manipulation .vis-button:hover {
+    background-color: #4a5568 !important; /* Un gris más claro para el hover */
+    box-shadow: none !important;
+}
+div.vis-manipulation .vis-button.vis-selected {
+    background-color: #6366f1 !important; /* Color de acento para el botón seleccionado */
+}
+div.vis-manipulation .vis-separator-line {
+    background: #4a5568 !important; /* Gris medio para las líneas separadoras */
+}
+
+/* ====== Formularios ====== */
+#genericForm label {
+  display: block;
+  margin-bottom: .5rem;
+  font-weight: 600;
+  color: #7c5656;
+}
+
+#genericForm input[type="text"],
+#genericForm textarea,
+#genericForm input[type="file"] {
+  width: 100%;
+  background: #242424;
+  color: #e40000;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: .75rem;
+  box-sizing: border-box;
+}
+
+#genericForm input[type="text"]:focus,
+#genericForm textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.5);
+}
+
+#imagePreview {
+  border: 1px dashed #444;
+  border-radius: 8px;
+}

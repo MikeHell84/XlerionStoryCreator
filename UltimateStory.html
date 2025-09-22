@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Xlerion Story Creator</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Iconos y fuentes -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+
+  <!-- Librerías para el Mapa Mental -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+
+  <!-- jsPDF para exportar a PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Estilos personalizados -->
+  <style>
+    body { font-family: 'Inter', sans-serif; background:#121212; color:#E0E0E0; }
+
+    .sidebar { width:280px; background:#1A1A1A; box-shadow:4px 0 10px rgba(0,0,0,0.3); display:flex; flex-direction:column; border-radius:0 12px 12px 0; }
+    .main-content { flex-grow:1; display:flex; flex-direction:column; overflow-y: auto; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: flex; flex-direction: column; flex-grow: 1; }
+
+    .tab-button.active { background:#333; color:#6366f1; border-bottom:2px solid #6366f1; }
+
+    .card { background:#1A1A1A; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.2); overflow:hidden; }
+
+    .btn { padding:.75rem 1.5rem; border-radius:9999px; font-weight:600; transition:all 0.3s ease; }
+    .btn-primary { background:#6366f1; color:white; }
+    .btn-primary:hover { background:#4338ca; transform:translateY(-2px); }
+    .btn-secondary { background:#333; color:#E0E0E0; }
+    .btn-secondary:hover { background:#444; transform:translateY(-2px); }
+
+    input[type=text], textarea, input[type=file] { background:#242424; color:#E0E0E0; border:1px solid #444; border-radius:8px; padding:.75rem; }
+    input[type=text]:focus, textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,0.5); }
+
+    .item-image { width:100%; height:150px; object-fit:cover; }
+    .placeholder-image { background:#242424; display:flex; justify-content:center; align-items:center; color:#666; font-size:2rem; height:150px; }
+
+    /* ---------- MODALES ---------- */
+    .modal-overlay {
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7);
+      display:flex; align-items:center; justify-content:center;
+      z-index:1000; opacity:0; visibility:hidden;
+      transition: opacity .25s ease, visibility .25s ease;
+    }
+    .modal-overlay.show { opacity:1; visibility:visible; }
+
+    .modal {
+      background:#1A1A1A;
+      border-radius:12px;
+      width:92%; max-width:820px;
+      max-height:90vh;
+      display:flex; flex-direction:column;
+      overflow:hidden;
+      padding:1rem; box-sizing:border-box;
+    }
+    .modal-header { flex:0 0 auto; }
+    .modal-body { flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-right:.5rem; }
+    .modal-footer { flex:0 0 auto; margin-top:.75rem; }
+
+    #detailsDescription { white-space:pre-wrap; word-break:break-word; line-height:1.5; color:#D1D5DB; }
+    #detailsImageContainer { max-height:36vh; overflow:hidden; border-radius:8px; margin-bottom:.75rem; }
+    #detailsImage { width:100%; height:100%; object-fit:cover; }
+
+    /* Scrollbar personalizado */
+    .modal-body::-webkit-scrollbar, #detailsDescription::-webkit-scrollbar { width:10px; }
+    .modal-body::-webkit-scrollbar-thumb, #detailsDescription::-webkit-scrollbar-thumb { background:rgba(99,102,241,0.2); border-radius:10px; }
+
+    /* FIX: Panel de manipulación de Vis.js - Posición y Estilo Mejorados */
+    #mindMapContainer div.vis-manipulation {
+        /* Posicionamiento en la parte inferior central */
+        position: absolute !important;
+        bottom: 20px !important;
+        left: 150% !important;
+        transform: translateX(-50%) !important;
+        top: auto !important; /* Anular el 'top' por defecto */
+        width: auto !important; /* Ancho automático basado en el contenido */
+        
+        /* Estilo del contenedor */
+        background: #1A1A1A !important; /* Fondo muy oscuro, consistente con la UI */
+        border: 1px solid #444 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
+        padding: 8px !important;
+        
+        /* Layout horizontal */
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px !important;
+    }
+
+    /* Ocultar el texto de la etiqueta para un look más limpio, los tooltips seguirán funcionando */
+    #mindMapContainer div.vis-manipulation .vis-label {
+        display: none !important;
+    }
+
+    /* Estilo de los botones individuales */
+    #mindMapContainer div.vis-manipulation .vis-button {
+        background-color: #242424 !important;
+        border: 1px solid #444 !important;
+        border-radius: 8px !important;
+        width: 44px !important; /* Tamaño fijo para botones cuadrados */
+        height: 44px !important;
+        transition: background-color 0.2s, border-color 0.2s;
+        background-position: center center !important; /* Centrar el icono */
+    }
+
+    #mindMapContainer div.vis-manipulation .vis-button:hover {
+        background-color: #333 !important;
+        border-color: #6366f1 !important; /* Resaltar con color de acento al pasar el ratón */
+    }
+
+    /* Estilo para el botón seleccionado/activo */
+    #mindMapContainer div.vis-manipulation .vis-button.vis-selected {
+        background-color: #6366f1 !important; /* Color de acento para el botón seleccionado */
+        border-color: #818cf8 !important;
+    }
+
+    /* Estilo de la línea separadora (ahora vertical) */
+    #mindMapContainer div.vis-manipulation .vis-separator-line {
+        width: 1px !important;
+        height: 30px !important; /* Altura para la línea vertical */
+        background: #444 !important;
+        margin: auto 4px !important; /* Centrar verticalmente y dar espacio horizontal */
+    }
+
+    /* Estilo para el sub-panel de edición (cuando se edita un nodo/enlace) */
+    #mindMapContainer div.vis-edit-mode {
+        background: #1A1A1A !important;
+        border: 1px solid #444 !important;
+        border-radius: 12px !important;
+        padding: 12px !important;
+    }
+
+    /* 
+     * FIX: Contraste y estética para el panel de configuración de físicas de Vis.js.
+     * NOTA: Vis.js añade este panel al 'body', no al contenedor del mapa, 
+     * por lo que los selectores no deben estar anidados dentro de #mindMapContainer.
+     */
+    div.vis-configuration-wrapper {
+        background: #1A1A1A !important;
+        border: 1px solid #444 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+        color: #e70000 !important;
+        /* --- Lógica de Centrado y Tamaño --- */
+        left: calc(50% + 140px) !important; /* Centra en el área de contenido (140px = 280px sidebar / 2) */
+        bottom: 80px !important; /* Lo mantiene sobre la barra de herramientas inferior */
+      
+        width: 90% !important; /* Usar porcentaje para adaptabilidad */
+        max-width: 500px !important; /* Ancho máximo ajustado para no ser tan grande */
+        min-width: 320px !important; /* Asegurar un ancho mínimo legible */
+        z-index: 1100 !important; /* Asegura que esté por encima de otros elementos */
+    }
+    /* Asegura que el contenedor interno no tenga su propio fondo blanco */
+    div.vis-configuration {
+        background: transparent !important;
+        color: inherit !important;
+    }
+    div.vis-configuration .vis-config-header {
+        color: #6366f1 !important;
+        font-weight: bold;
+        border-bottom: 1px solid #444;
+    }
+    div.vis-configuration .vis-config-item .vis-config-label {
+        color: #00f7ff !important;
+    }
+    /* Asegura que el texto del valor del slider (ej: "0.3") sea visible */
+    div.vis-configuration .vis-config-item .vis-config-field {
+        color: #000000 !important;
+    }
+    div.vis-configuration .vis-config-item input[type=range] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #444;
+        border-radius: 5px;
+        outline: none;
+        transition: background 0.2s;
+    }
+    div.vis-configuration .vis-config-item input[type=range]:hover {
+        background: #555;
+    }
+    div.vis-configuration .vis-config-item input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none; width: 18px; height: 18px; background: #6366f1; cursor: pointer; border-radius: 50%;
+    }
+    div.vis-configuration .vis-config-item input[type=range]::-moz-range-thumb {
+        width: 18px; height: 18px; background: #6366f1; cursor: pointer; border-radius: 50%;
+    }
+
+    /* Botón de cierre (X) */
+    div.vis-configuration .vis-close {
+        background: #242424 !important;
+        border-radius: 50% !important;
+        width: 28px !important;
+        height: 28px !important;
+        top: 10px !important;
+        right: 10px !important;
+        transition: background-color 0.2s, transform 0.2s;
+    }
+    div.vis-configuration .vis-close:hover { 
+        background: #6366f1 !important;
+        transform: rotate(90deg);
+    }
+  </style>
+</head>
+
+<body class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar p-6 space-y-4">
+    <h1 class="text-3xl font-bold text-indigo-400">Xlerion Story Creator</h1>
+    <button id="btnNuevoProyecto" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i> Nuevo Proyecto</button>
+    <div class="flex-grow overflow-y-auto pr-2">
+      <ul id="listaProyectos" class="space-y-3"></ul>
+    </div>
+    <div class="space-y-2 pt-4 border-t border-gray-700 relative">
+      <div id="export-menu-container" class="relative">
+        <button id="btnToggleExport" class="btn btn-secondary w-full flex justify-center items-center"><i class="fas fa-file-export mr-2"></i> Exportar <i class="fas fa-chevron-up ml-auto text-xs"></i></button>
+        <div id="export-options" class="hidden absolute bottom-full mb-2 w-full bg-[#242424] rounded-lg shadow-lg border border-gray-600 z-10">
+            <a href="#" id="btnExportarJSON" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-t-lg">Exportar a JSON</a>
+            <a href="#" id="btnExportarHTML" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Exportar a HTML</a>
+            <a href="#" id="btnExportarPDF" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-b-lg">Exportar a PDF</a>
+        </div>
+      </div>
+      <button id="btnImportar" class="btn btn-secondary w-full"><i class="fas fa-file-import mr-2"></i> Importar</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-grow flex flex-col overflow-y-auto">
+    <div id="welcomeScreen" class="flex-grow flex flex-col items-center justify-center text-center">
+      <h2 class="text-4xl font-bold mb-4">¡Bienvenido!</h2>
+      <p class="text-gray-400 mb-6">Comienza un nuevo proyecto o selecciona uno existente para empezar a diseñar tu historia.</p>
+      <button id="btnCrearInicial" class="btn btn-primary">Crear Nuevo Proyecto</button>
+    </div>
+
+    <div id="projectScreen" class="hidden flex-grow flex flex-col p-8">
+      <header class="flex justify-between items-center mb-6">
+        <div class="flex items-center space-x-4">
+          <h2 id="nombreProyecto" class="text-4xl font-bold text-white"></h2>
+          <button id="btnEditarNombre" class="text-indigo-400 hover:text-indigo-300"><i class="fas fa-edit"></i></button>
+          <button id="btnEliminarProyecto" class="text-red-500 hover:text-red-400"><i class="fas fa-trash-alt"></i></button>
+        </div>
+        <nav class="flex space-x-2 p-1 bg-[#1A1A1A] rounded-full">
+          <button data-tab="dashboard" class="tab-button active py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-chart-line mr-1"></i>Dashboard</button>
+          <button data-tab="chapters" class="tab-button py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-book mr-1"></i>Capítulos</button>
+          <button data-tab="characters" class="tab-button py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-users mr-1"></i>Personajes</button>
+          <button data-tab="places" class="tab-button py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-map-marker-alt mr-1"></i>Lugares</button>
+          <button data-tab="objects" class="tab-button py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-box mr-1"></i>Objetos</button>
+          <button data-tab="mindmap" class="tab-button py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-project-diagram mr-1"></i>Mapa Mental</button>
+        </nav>
+      </header>
+
+      <!-- Dashboard -->
+      <div id="tab-dashboard" class="tab-content active overflow-y-auto">
+
+        <h3 class="text-2xl font-bold mb-6">Resumen del Proyecto</h3>
+        
+        <!-- Portada del Proyecto y botón de IA -->
+        <div class="mb-6">
+            <div class="card relative group cursor-pointer" id="projectCoverWrapper">
+                <img id="projectCoverImage" src="" alt="Portada del Proyecto" class="w-full h-64 object-cover rounded-lg hidden">
+                <div id="projectCoverPlaceholder" class="w-full h-64 bg-[#242424] border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center">
+                    <div class="text-center text-gray-500">
+                        <i class="fas fa-image text-5xl mb-2"></i>
+                        <p>Añade una portada para tu proyecto</p>
+                    </div>
+                </div>
+                <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                    <span class="text-white text-lg"><i class="fas fa-edit mr-2"></i>Cambiar Portada</span>
+                </div>
+                <input type="file" id="inputProjectCover" class="hidden" accept="image/*">
+            </div>
+            <button type="button" id="btnOpenCoverGenerator" class="btn btn-primary mt-4 w-full flex items-center justify-center">
+                <i class="fas fa-paint-brush mr-2"></i>
+                <span>Gestionar Portada con IA</span>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div class="card p-6 flex flex-col items-center justify-center"><i class="fas fa-book text-4xl text-indigo-400 mb-2"></i><p>Total de Capítulos</p><p id="totalChapters" class="text-5xl font-extrabold">0</p></div>
+          <div class="card p-6 flex flex-col items-center justify-center"><i class="fas fa-users text-4xl text-indigo-400 mb-2"></i><p>Total de Personajes</p><p id="totalCharacters" class="text-5xl font-extrabold">0</p></div>
+          <div class="card p-6 flex flex-col items-center justify-center"><i class="fas fa-map-marker-alt text-4xl text-indigo-400 mb-2"></i><p>Total de Lugares</p><p id="totalPlaces" class="text-5xl font-extrabold">0</p></div>
+          <div class="card p-6 flex flex-col items-center justify-center"><i class="fas fa-box text-4xl text-indigo-400 mb-2"></i><p>Total de Objetos</p><p id="totalObjects" class="text-5xl font-extrabold">0</p></div>
+          <div class="card p-6 flex flex-col items-center justify-center"><i class="fas fa-images text-4xl text-indigo-400 mb-2"></i><p>Total de Imágenes</p><p id="totalImages" class="text-5xl font-extrabold">0</p></div>
+        </div>
+
+        <div class="mt-8">
+            <h3 class="text-2xl font-bold mb-4">Galería Rápida</h3>
+            <div id="quickGallery" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                <!-- Las imágenes se insertarán aquí con JS -->
+            </div>
+        </div>
+
+        <!-- Elementos Destacados -->
+        <div class="mt-8">
+            <h3 class="text-2xl font-bold mb-6">Elementos Destacados</h3>
+            
+            <h4 class="text-xl font-semibold mb-4 text-indigo-400">Personajes Aleatorios</h4>
+            <div id="featuredCharactersContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+                <!-- JS poblará esto -->
+            </div>
+
+            <h4 class="text-xl font-semibold mb-4 text-green-400">Lugares Aleatorios</h4>
+            <div id="featuredPlacesContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+                <!-- JS poblará esto -->
+            </div>
+
+            <h4 class="text-xl font-semibold mb-4 text-yellow-400">Objetos Aleatorios</h4>
+            <div id="featuredObjectsContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+                <!-- JS poblará esto -->
+            </div>
+        </div>
+
+        <!-- Análisis del Proyecto -->
+        <div class="mt-8">
+            <h3 class="text-2xl font-bold mb-6">Análisis del Proyecto</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div id="characterAgeChartContainer" class="card p-6">
+                    <h4 class="text-xl font-semibold mb-4 text-purple-400">Demografía de Personajes (Edad)</h4>
+                    <div class="relative h-96"><canvas id="characterAgeChart"></canvas></div>
+                </div>
+                <div id="characterGenderChartContainer" class="card p-6">
+                    <h4 class="text-xl font-semibold mb-4 text-teal-400">Demografía de Personajes (Género)</h4>
+                    <div class="relative h-96"><canvas id="characterGenderChart"></canvas></div>
+                </div>
+                <div id="placeTypeChartContainer" class="card p-6">
+                    <h4 class="text-xl font-semibold mb-4 text-cyan-400">Distribución de Lugares (Tipo)</h4>
+                    <div class="relative h-96"><canvas id="placeTypeChart"></canvas></div>
+                </div>
+                <div id="objectTypeChartContainer" class="card p-6">
+                    <h4 class="text-xl font-semibold mb-4 text-orange-400">Distribución de Objetos (Tipo)</h4>
+                    <div class="relative h-96"><canvas id="objectTypeChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+      </div>
+
+      <!-- Capítulos -->
+      <div id="tab-chapters" class="tab-content overflow-y-auto">
+        <div class="flex justify-between mb-6">
+          <h3 class="text-2xl font-bold">Capítulos</h3>
+          <button id="btnAddChapter" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Añadir Capítulo</button>
+        </div>
+        <div id="chaptersList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+      </div>
+
+      <!-- Personajes -->
+      <div id="tab-characters" class="tab-content overflow-y-auto">
+        <div class="flex justify-between mb-6">
+          <h3 class="text-2xl font-bold">Personajes</h3>
+          <button id="btnAddCharacter" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Añadir Personaje</button>
+        </div>
+        <div id="charactersList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+      </div>
+
+      
+
+      <!-- Lugares -->
+      <div id="tab-places" class="tab-content overflow-y-auto">
+        <div class="flex justify-between mb-6">
+          <h3 class="text-2xl font-bold">Lugares</h3>
+          <button id="btnAddPlace" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Añadir Lugar</button>
+        </div>
+        <div id="placesList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+      </div>
+
+      <!-- Objetos -->
+      <div id="tab-objects" class="tab-content overflow-y-auto">
+        <div class="flex justify-between mb-6">
+          <h3 class="text-2xl font-bold">Objetos</h3>
+          <button id="btnAddObject" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Añadir Objeto</button>
+        </div>
+        <div id="objectsList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+      </div>
+
+      <!-- Mapa Mental -->
+      <div id="tab-mindmap" class="tab-content relative min-h-0"> <!-- FIX: min-h-0 es crucial para el layout de flexbox anidado y evita la expansión infinita -->
+          <div id="mindmap-toolbar" class="p-4 bg-[#1A1A1A] border-b border-gray-700 flex items-center gap-4">
+              <button id="btnGenerateMindMap" class="btn btn-primary">
+                  <i class="fas fa-cogs mr-2"></i>Generar desde Contenido
+              </button>
+              <button id="btnLinkNodes" class="btn btn-secondary">
+                <i class="fas fa-link mr-2"></i>Enlazar Nodos
+              </button>
+              <span class="text-gray-400 text-sm">Usa los botones del mapa para añadir, editar o enlazar nodos.</span>
+          </div>
+          <div id="mindMapContainer" class="w-full h-[80vh] border border-gray-700 rounded-lg bg-[#1A1A1A]"></div>
+          <div id="mindmap-legend" class="absolute top-20 right-4 bg-[#1A1A1A] p-3 rounded-lg shadow-lg border border-gray-700 text-sm z-10">
+              <h4 class="font-bold mb-2 text-white">Leyenda</h4>
+              <div class="flex items-center mb-1">
+                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #1e40af; border: 1px solid #60a5fa;"></span>
+                  <span class="text-gray-300">Capítulos</span>
+              </div>
+              <div class="flex items-center mb-1">
+                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #7f1d1d; border: 1px solid #f87171;"></span>
+                  <span class="text-gray-300">Personajes</span>
+              </div>
+              <div class="flex items-center mb-1">
+                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #166534; border: 1px solid #4ade80;"></span>
+                  <span class="text-gray-300">Lugares</span>
+              </div>
+              <div class="flex items-center">
+                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #854d0e; border: 1px solid #fbbf24;"></span>
+                  <span class="text-gray-300">Objetos</span>
+              </div>
+          </div>
+      </div>
+    </div>
+  </main>
+
+ <!-- Modal genérico -->
+<div id="genericModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle" class="text-2xl font-bold"></h3>
+    </div>
+    <div class="modal-body">
+      <form id="genericForm" class="space-y-4">
+        <!-- Campo nombre -->
+        <div class="flex flex-col">
+          <label for="inputName" class="mb-2 font-semibold">Nombre</label>
+          <input type="text" id="inputName" required class="w-full">
+        </div>
+
+        <!-- Campos de Capítulo Agrupados -->
+        <div class="chapter-field hidden p-4 bg-[#242424] rounded-lg border border-gray-700 space-y-4">
+            <h4 class="text-lg font-semibold text-indigo-400 border-b border-gray-600 pb-2">Detalles del Capítulo</h4>
+            <div class="flex flex-col">
+                <label for="inputOrder" class="mb-2 font-semibold">Número de Orden</label>
+                <input type="number" id="inputOrder" class="w-full" placeholder="Ej: 1" min="0">
+            </div>
+        </div>
+
+        <!-- Campos de Personaje Agrupados -->
+        <div class="character-field hidden p-4 bg-[#242424] rounded-lg border border-gray-700 space-y-4">
+            <h4 class="text-lg font-semibold text-indigo-400 border-b border-gray-600 pb-2">Detalles del Personaje</h4>
+            <!-- Campos Edad y Altura -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col">
+                <label for="inputAge" class="mb-2 font-semibold">Edad</label>
+                <input type="text" id="inputAge" class="w-full">
+              </div>
+              <div class="flex flex-col">
+                <label for="inputHeight" class="mb-2 font-semibold">Altura</label>
+                <input type="text" id="inputHeight" class="w-full">
+              </div>
+            </div>
+
+            <!-- Campo Género -->
+            <div class="flex flex-col">
+              <label for="inputGender" class="mb-2 font-semibold">Género</label>
+              <select id="inputGender" class="w-full bg-[#242424] color-[#E0E0E0] border border-gray-600 rounded-lg p-3 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50">
+                  <option value="no-especificado">No especificado</option>
+                  <option value="femenino">Femenino</option>
+                  <option value="masculino">Masculino</option>
+                  <option value="androgino">Andrógino</option>
+                  <option value="no-binario">No Binario</option>
+                  <option value="otro">Otro</option>
+              </select>
+            </div>
+
+            <!-- Campo Descripción Física -->
+            <div class="flex flex-col">
+              <label for="inputPhysicalDescription" class="mb-2 font-semibold">Descripción Física</label>
+              <textarea id="inputPhysicalDescription" rows="3" class="w-full"></textarea>
+            </div>
+            
+            <!-- Campo Historia -->
+            <div class="flex flex-col">
+              <label for="inputBackstory" class="mb-2 font-semibold">Historia / Trasfondo</label>
+              <textarea id="inputBackstory" rows="5" class="w-full"></textarea>
+            </div>
+        </div>
+
+        <!-- Campos de Lugar Agrupados -->
+        <div class="place-field hidden p-4 bg-[#242424] rounded-lg border border-gray-700 space-y-4">
+            <h4 class="text-lg font-semibold text-indigo-400 border-b border-gray-600 pb-2">Detalles del Lugar</h4>
+            <!-- Campo Tipo de Lugar -->
+            <div class="flex flex-col">
+              <label for="inputPlaceType" class="mb-2 font-semibold">Tipo de Lugar</label>
+              <select id="inputPlaceType" class="w-full bg-[#242424] color-[#E0E0E0] border border-gray-600 rounded-lg p-3 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50">
+                  <option value="no-especificado">No especificado</option>
+                  <option value="terrenal">Terrenal</option>
+                  <option value="espacial">Espacial</option>
+                  <option value="astral">Astral</option>
+                  <option value="urbano">Urbano</option>
+                  <option value="rural">Rural</option>
+                  <option value="ficticio">Ficticio</option>
+                  <option value="historico">Histórico</option>
+              </select>
+            </div>
+            <!-- Campo Atmósfera -->
+            <div class="flex flex-col">
+              <label for="inputAtmosphere" class="mb-2 font-semibold">Atmósfera / Ambiente</label>
+              <textarea id="inputAtmosphere" rows="3" class="w-full"></textarea>
+            </div>
+            <!-- Campo Características Clave -->
+            <div class="flex flex-col">
+              <label for="inputKeyFeatures" class="mb-2 font-semibold">Características Clave</label>
+              <textarea id="inputKeyFeatures" rows="3" class="w-full" placeholder="Ej: Un antiguo altar de piedra, un río de lava, árboles que susurran..."></textarea>
+            </div>
+            <!-- Campo Historia / Lore -->
+            <div class="flex flex-col">
+              <label for="inputPlaceLore" class="mb-2 font-semibold">Historia / Lore</label>
+              <textarea id="inputPlaceLore" rows="5" class="w-full"></textarea>
+            </div>
+            <!-- Campo Mapa del Lugar -->
+            <div class="flex flex-col">
+                <label for="inputPlaceMap" class="mb-2 font-semibold">Mapa del Lugar</label>
+                <div class="flex items-start gap-4">
+                    <div class="flex-grow">
+                        <input type="file" id="inputPlaceMap" accept="image/*" class="w-full">
+                    <!-- Campo para seleccionar el servicio de IA para mapas -->
+                    <div id="mapServiceField" class="hidden mt-2">
+                        <label for="inputMapService" class="block text-sm font-medium text-gray-300 mb-1">Servicio de IA para Mapas</label>
+                        <select id="inputMapService" class="w-full bg-[#242424] border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="pollinations">Pollinations.ai (Rápido, variado)</option>
+                            <option value="stablediffusion">Stable Diffusion (Detallado)</option>
+                        </select>
+                    </div>
+                    <!-- Campo para seleccionar el estilo del mapa -->
+                    <div id="mapStyleField" class="hidden mt-2">
+                        <label for="inputMapStyle" class="block text-sm font-medium text-gray-300 mb-1">Estilo de Mapa</label>
+                        <select id="inputMapStyle" class="w-full bg-[#242424] border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="satellite">Satélite Realista</option>
+                            <option value="fantasy">Fantasía (Dibujado a mano)</option>
+                            <option value="blueprint">Plano / Blueprint</option>
+                            <option value="ancient">Pergamino Antiguo</option>
+                            <option value="cyberpunk">Cyberpunk / Neón</option>
+                        </select>
+                    </div>
+                        <button type="button" id="btnGenerateMap" class="btn btn-secondary text-sm mt-2 w-full flex items-center justify-center">
+                            <i class="fas fa-magic mr-2"></i>
+                            <span id="btnGenerateMapText">Generar Mapa con IA</span>
+                            <i id="mapSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                        </button>
+                    </div>
+                    <div class="relative w-32 h-32 flex-shrink-0">
+                        <div id="mapPreview" class="w-full h-full bg-[#242424] border border-gray-600 rounded-lg flex items-center justify-center text-gray-500 overflow-hidden">
+                            <i class="fas fa-map text-3xl"></i>
+                        </div>
+                        <button type="button" id="btnDeleteMapImage" title="Eliminar imagen del mapa" class="absolute top-1 right-1 w-6 h-6 bg-red-600/80 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs hidden transition-opacity z-10">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gestión de Imágenes -->
+            <div id="imageSwapContainer" class="p-3 bg-gray-900/50 rounded-lg border border-gray-700 mt-4">
+                <h5 class="text-md font-semibold text-indigo-400 mb-3 text-center">Gestión de Imágenes</h5>
+                <div class="flex justify-center items-center gap-4">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-400">Imagen Principal</p>
+                        <i class="fas fa-image text-2xl my-2"></i>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <button type="button" id="btnUseMapAsMain" title="Usar mapa como imagen principal" class="w-12 h-10 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white flex items-center justify-center transition-transform hover:scale-110"><i class="fas fa-arrow-left"></i></button>
+                        <button type="button" id="btnUseMainAsMap" title="Usar imagen principal como mapa" class="w-12 h-10 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white flex items-center justify-center transition-transform hover:scale-110"><i class="fas fa-arrow-right"></i></button>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-400">Mapa del Lugar</p>
+                        <i class="fas fa-map text-2xl my-2"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 text-center mt-2">Usa estos botones para copiar una imagen de un campo a otro.</p>
+            </div>
+        </div>
+
+        <!-- Campos de Objeto Agrupados -->
+        <div class="object-field hidden p-4 bg-[#242424] rounded-lg border border-gray-700 space-y-4">
+            <h4 class="text-lg font-semibold text-indigo-400 border-b border-gray-600 pb-2">Detalles del Objeto</h4>
+            <!-- Campo Tipo/Categoría -->
+            <div class="flex flex-col">
+                <label for="inputObjectType" class="mb-2 font-semibold">Tipo / Categoría</label>
+                <select id="inputObjectType" class="w-full bg-[#242424] color-[#E0E0E0] border border-gray-600 rounded-lg p-3 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50">
+                    <option value="no-especificado">No especificado</option>
+                    <option value="arma">Arma</option>
+                    <option value="reliquia">Reliquia</option>
+                    <option value="herramienta">Herramienta</option>
+                    <option value="consumible">Consumible</option>
+                    <option value="documento">Documento</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+            <!-- Campo Origen -->
+            <div class="flex flex-col">
+              <label for="inputObjectOrigin" class="mb-2 font-semibold">Origen / Fabricación</label>
+              <textarea id="inputObjectOrigin" rows="3" class="w-full"></textarea>
+            </div>
+            <!-- Campo Poderes/Habilidades -->
+            <div class="flex flex-col">
+              <label for="inputObjectPowers" class="mb-2 font-semibold">Poderes / Habilidades</label>
+              <textarea id="inputObjectPowers" rows="3" class="w-full"></textarea>
+            </div>
+            <!-- Campo Relevancia en la Trama -->
+            <div class="flex flex-col">
+              <label for="inputObjectRelevance" class="mb-2 font-semibold">Relevancia en la Trama</label>
+              <textarea id="inputObjectRelevance" rows="4" class="w-full"></textarea>
+            </div>
+        </div>
+
+        <!-- Campo descripción general -->
+        <div class="flex flex-col">
+          <label for="inputDescription" class="mb-2 font-semibold">Descripción General / Personalidad</label>
+          <textarea id="inputDescription" rows="4" class="w-full"></textarea>
+        </div>
+
+        <!-- Campo imagen -->
+        <div class="flex flex-col">
+          <label for="inputImage" class="mb-2 font-semibold">Imagen</label>
+            <div class="flex items-start gap-4">
+                <div class="flex-grow">
+                    <input type="file" id="inputImage" accept="image/*" class="w-full">
+                    <!-- Campo para seleccionar el servicio de IA -->
+                    <div id="imageServiceField" class="hidden mt-2">
+                        <label for="inputImageService" class="block text-sm font-medium text-gray-300 mb-1">Servicio de IA</label>
+                        <select id="inputImageService" class="w-full bg-[#242424] border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="pollinations">Pollinations.ai (Rápido, variado)</option>
+                            <option value="stablediffusion">Stable Diffusion (Detallado)</option>
+                        </select>
+                    </div>
+                    <!-- Campo para seleccionar el estilo de la imagen principal -->
+                    <div id="imageStyleField" class="hidden mt-2">
+                        <label for="inputImageStyle" class="block text-sm font-medium text-gray-300 mb-1">Estilo de Imagen</label>
+                        <select id="inputImageStyle" class="w-full bg-[#242424] border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="default">Por Defecto (Fantasía)</option>
+                            <option value="futuristic">Futurista / Sci-Fi</option>
+                            <option value="modern">Moderno / Realista</option>
+                            <option value="vintage">Vintage / Pasado</option>
+                            <option value="dynamic">Dinámico / Acción</option>
+                            <option value="surreal">Surrealista / Abstracto</option>
+                            <option value="minimalist">Minimalista</option>
+                            <option value="biological">Biológico / Orgánico</option>
+                            <option value="chemical">Químico / Abstracto</option>
+                            <option value="steampunk">Steampunk</option>
+                            <option value="blueprint">Plano / Blueprint</option>
+                        </select>
+                    </div>
+                    <button type="button" id="btnGenerateImage" class="btn btn-secondary text-sm mt-2 w-full flex items-center justify-center">
+                        <i class="fas fa-magic mr-2"></i>
+                        <span id="btnGenerateImageText">Generar Imagen con IA</span>
+                        <i id="imageSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                    </button>
+                </div>
+                <div class="relative w-32 h-32 flex-shrink-0">
+                    <div id="imagePreview" class="w-full h-full bg-[#242424] border border-gray-600 rounded-lg flex items-center justify-center text-gray-500 overflow-hidden">
+                        <i class="fas fa-image text-3xl"></i>
+                    </div>
+                    <button type="button" id="btnDeleteImage" title="Eliminar imagen" class="absolute top-1 right-1 w-6 h-6 bg-red-600/80 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs hidden transition-opacity z-10">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <!-- Botones -->
+      <div class="flex justify-end space-x-4">
+        <button type="button" id="btnCancel" class="btn btn-secondary">Cancelar</button>
+        <button type="submit" form="genericForm" id="btnSave" class="btn btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Generar Portada -->
+<div id="coverGeneratorModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="text-2xl font-bold">Gestionar Portada del Proyecto</h3>
+    </div>
+    <div class="modal-body">
+      <form id="coverGeneratorForm" class="space-y-6">
+        <!-- Descripción Larga / Sinopsis -->
+        <div>
+            <label for="projectSummary" class="block text-xl font-semibold mb-2 text-indigo-400">Resumen del Proyecto / Sinopsis</label>
+            <p class="text-sm text-gray-400 mb-4">Escribe aquí un resumen de tu historia. Este texto se usará para las exportaciones y para generar la portada con IA.</p>
+            <textarea id="projectSummary" rows="6" class="w-full bg-[#242424] border border-gray-600 rounded-lg p-3 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50" placeholder="Ej: En un mundo post-apocalíptico, dos héroes viajan en el tiempo para..."></textarea>
+        </div>
+        <!-- Campo para seleccionar el servicio de IA para portadas -->
+        <div>
+            <label for="coverImageService" class="block text-sm font-medium text-gray-300 mb-1">Servicio de IA para Portada</label>
+            <select id="coverImageService" class="w-full bg-[#242424] border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="pollinations">Pollinations.ai (Rápido, variado)</option>
+                <option value="stablediffusion">Stable Diffusion (Detallado)</option>
+            </select>
+        </div>
+        
+        <!-- Campo para seleccionar el estilo de la portada -->
+        <div>
+            <label for="coverImageStyle" class="block text-sm font-medium text-gray-300 mb-1">Estilo de Portada</label>
+            <select id="coverImageStyle" class="w-full bg-[#242424] border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="default">Por Defecto (Fantasía)</option>
+                <option value="futuristic">Futurista / Sci-Fi</option>
+                <option value="modern">Moderno / Realista</option>
+                <option value="vintage">Vintage / Pasado</option>
+                <option value="surreal">Surrealista / Abstracto</option>
+                <option value="minimalist">Minimalista</option>
+                <option value="steampunk">Steampunk</option>
+                <option value="blueprint">Plano / Blueprint</option>
+            </select>
+        </div>
+
+        <!-- Preview de la portada actual -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Portada Actual</label>
+            <div id="coverPreviewInModal" class="w-full h-48 bg-[#242424] border border-gray-600 rounded-lg flex items-center justify-center text-gray-500 overflow-hidden">
+                <i class="fas fa-image text-4xl"></i>
+            </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <div class="flex justify-end space-x-4">
+        <button type="button" id="btnCancelCoverGeneration" class="btn btn-secondary">Cancelar</button>
+        <button type="button" id="btnGenerateProjectCover" class="btn btn-primary flex items-center justify-center"><i class="fas fa-magic mr-2"></i><span id="btnGenerateProjectCoverText">Generar Nueva Portada</span><i id="projectCoverSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Modal de detalles -->
+  <div id="detailsModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <div id="detailsImageContainer" class="w-full h-64 rounded-lg overflow-hidden mb-4 hidden">
+          <img id="detailsImage" class="w-full h-full object-cover" src="" alt="">
+        </div>
+        <h3 id="detailsTitle" class="text-3xl font-bold mb-2"></h3>
+        <!-- Contenedor para detalles de personaje -->
+        <div id="characterDetailsInfo" class="hidden flex flex-wrap gap-x-6 gap-y-2 text-gray-400 mb-4">
+          <div id="detailsAgeContainer" class="hidden">
+            <span class="font-semibold text-indigo-400">Edad:</span>
+            <span id="detailsAge"></span>
+          </div>
+          <div id="detailsHeightContainer" class="hidden">
+            <span class="font-semibold text-indigo-400">Altura:</span>
+            <span id="detailsHeight"></span>
+          </div>
+          <div id="detailsGenderContainer" class="hidden">
+            <span class="font-semibold text-indigo-400">Género:</span>
+            <span id="detailsGender"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-body">
+        <!-- Contenedor para detalles de lugar -->
+        <div id="placeDetailsInfo" class="hidden mb-6 space-y-6">
+            <div id="detailsPlaceTypeContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Tipo de Lugar</h4>
+                <p id="detailsPlaceType" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="detailsAtmosphereContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Atmósfera / Ambiente</h4>
+                <p id="detailsAtmosphere" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="detailsKeyFeaturesContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Características Clave</h4>
+                <p id="detailsKeyFeatures" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="detailsPlaceLoreContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Historia / Lore</h4>
+                <p id="detailsPlaceLore" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+        </div>
+        
+        <!-- Contenedor para el mapa del lugar -->
+        <div id="detailsMapContainer" class="hidden mt-6">
+            <h4 class="font-bold text-xl mb-2 text-indigo-400">Mapa del Lugar</h4>
+            <div class="w-full bg-gray-800 p-2 rounded-lg border border-gray-700">
+                <img id="detailsMap" class="w-full h-auto object-contain rounded-md" src="" alt="Mapa del Lugar">
+            </div>
+        </div>
+
+        <!-- Contenedor para detalles de objeto -->
+        <div id="objectDetailsInfo" class="hidden mb-6 space-y-6">
+            <div id="detailsObjectTypeContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Tipo / Categoría</h4>
+                <p id="detailsObjectType" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="detailsObjectOriginContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Origen / Fabricación</h4>
+                <p id="detailsObjectOrigin" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="detailsObjectPowersContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Poderes / Habilidades</h4>
+                <p id="detailsObjectPowers" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="detailsObjectRelevanceContainer" class="hidden">
+                <h4 class="font-bold text-xl mb-2 text-indigo-400">Relevancia en la Trama</h4>
+                <p id="detailsObjectRelevance" class="text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+        </div>
+
+        <!-- Contenedor para descripción física -->
+        <div id="detailsPhysicalDescriptionContainer" class="hidden mb-6">
+          <h4 class="font-bold text-xl mb-2 text-indigo-400">Descripción Física</h4>
+          <p id="detailsPhysicalDescription" class="text-gray-300 whitespace-pre-wrap"></p>
+        </div>
+        <!-- Contenedor para descripción general -->
+        <div id="detailsDescriptionContainer" class="mb-6">
+          <h4 id="detailsDescriptionHeader" class="font-bold text-xl mb-2 text-indigo-400">Descripción General / Personalidad</h4>
+          <p id="detailsDescription" class="text-gray-300 whitespace-pre-wrap"></p>
+        </div>
+        <!-- Contenedor para la historia -->
+        <div id="detailsBackstoryContainer" class="hidden mt-6">
+          <h4 class="font-bold text-xl mb-2 text-indigo-400">Historia / Trasfondo</h4>
+          <p id="detailsBackstory" class="text-gray-300 whitespace-pre-wrap"></p>
+        </div>
+      </div>
+      <div class="modal-footer flex justify-end space-x-4">
+        <button type="button" id="btnEditDetails" class="btn btn-primary"><i class="fas fa-edit mr-2"></i>Editar</button>
+        <button type="button" id="btnDeleteDetails" class="btn btn-secondary"><i class="fas fa-trash-alt mr-2"></i>Eliminar</button>
+        <button type="button" id="btnCloseDetails" class="btn btn-secondary">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Script -->
+  <script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>
+  <script src="app.js"></script>
+</body>
+<script>
+    // FIX: Mover el script de app.js aquí para asegurar que el DOM esté completamente cargado
+    // y evitar problemas de referencia de elementos.
+    // El contenido de app.js se ha movido a este bloque.
+    // ... (El contenido completo de app.js que se muestra a continuación va aquí)
+</script>
+
+</html>
