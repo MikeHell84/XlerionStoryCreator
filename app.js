@@ -21,6 +21,9 @@ const dom = {
   projectsList: document.getElementById('listaProyectos'),
   projectName: document.getElementById('nombreProyecto'),
   tabButtons: document.querySelectorAll('.tab-button'),
+  tabsToggle: document.getElementById('tabs-toggle'),
+  tabsNav: document.getElementById('tabs-nav'),
+  currentTabName: document.getElementById('current-tab-name'),
   tabContents: document.querySelectorAll('.tab-content'),
   btnAddChapter: document.getElementById('btnAddChapter'),
   btnAddCharacter: document.getElementById('btnAddCharacter'),
@@ -578,6 +581,40 @@ if (dom.projectCoverWrapper) {
       reader.readAsDataURL(file);
     }
   });
+}
+
+// --- Lógica para la navegación por pestañas responsive (dropdown) ---
+if (dom.tabsToggle && dom.tabsNav && dom.currentTabName) {
+    // Abrir/cerrar el dropdown de pestañas en móvil
+    dom.tabsToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dom.tabsNav.classList.toggle('hidden');
+    });
+
+    // Actualizar el nombre de la pestaña actual en el botón del dropdown
+    // y cerrar el dropdown al seleccionar una opción
+    dom.tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // El texto del botón sin el icono
+            const buttonText = button.textContent.trim();
+            dom.currentTabName.textContent = buttonText;
+
+            // Ocultar el dropdown solo si estamos en vista móvil
+            if (getComputedStyle(dom.tabsToggle).display !== 'none') {
+                dom.tabsNav.classList.add('hidden');
+            }
+        });
+    });
+
+    // Cerrar el dropdown si se hace clic fuera de él
+    document.addEventListener('click', (e) => {
+        const isClickInsideNav = dom.tabsNav.contains(e.target);
+        const isClickOnToggle = dom.tabsToggle.contains(e.target);
+
+        if (!isClickInsideNav && !isClickOnToggle) {
+            dom.tabsNav.classList.add('hidden');
+        }
+    });
 }
 
 // --- Lógica de Exportación (JSON y PDF) ---
