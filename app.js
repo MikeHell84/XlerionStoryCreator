@@ -2658,3 +2658,29 @@ window.addEventListener('resize', () => {
         }, 200);
     }
 });
+
+// --- Lógica para la barra lateral responsive ---
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+
+if (sidebar && sidebarToggle) {
+  sidebarToggle.addEventListener('click', (e) => {
+    // Detiene la propagación para evitar que el listener del documento se active inmediatamente
+    e.stopPropagation();
+    sidebar.classList.toggle('-translate-x-full');
+  });
+
+  // Cierra el sidebar si se hace clic fuera de él en vista móvil
+  document.addEventListener('click', (e) => {
+    const isClickInsideSidebar = sidebar.contains(e.target);
+    const isClickOnToggle = sidebarToggle.contains(e.target);
+
+    // Si el sidebar está abierto y el clic fue fuera de él y del botón de toggle
+    if (!sidebar.classList.contains('-translate-x-full') && !isClickInsideSidebar && !isClickOnToggle) {
+      // Solo cierra si el botón de toggle es visible (estamos en móvil)
+      if (getComputedStyle(sidebarToggle).display !== 'none') {
+        sidebar.classList.add('-translate-x-full');
+      }
+    }
+  });
+}

@@ -223,8 +223,13 @@
 
 <body class="flex h-screen overflow-hidden">
 
+  <!-- Botón para mostrar/ocultar la barra lateral en móviles -->
+  <button id="sidebar-toggle" class="md:hidden fixed top-4 left-4 z-50 p-2 bg-indigo-600 text-white rounded-md shadow-lg">
+    <i class="fas fa-bars text-xl"></i>
+  </button>
+
   <!-- Sidebar -->
-  <aside class="sidebar p-6 space-y-4">
+  <aside id="sidebar" class="sidebar p-6 space-y-4 md:relative md:translate-x-0 fixed h-full -translate-x-full transition-transform duration-300 ease-in-out z-40">
     <h1 class="text-3xl font-bold text-indigo-400">Xlerion Story Creator</h1>
     <button id="btnNuevoProyecto" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i> Nuevo Proyecto</button>
     <div class="flex-grow overflow-y-auto pr-2">
