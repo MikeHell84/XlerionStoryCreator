@@ -169,6 +169,8 @@ const dom = {
   placeTypeChart: document.getElementById('placeTypeChart'),
   objectTypeChartContainer: document.getElementById('objectTypeChartContainer'),
   objectTypeChart: document.getElementById('objectTypeChart'),
+  sidebar: document.getElementById('sidebar'),
+  sidebarToggle: document.getElementById('sidebar-toggle'),
 };
 
 // --- Gestión de datos (IndexedDB) ---
@@ -581,40 +583,6 @@ if (dom.projectCoverWrapper) {
       reader.readAsDataURL(file);
     }
   });
-}
-
-// --- Lógica para la navegación por pestañas responsive (dropdown) ---
-if (dom.tabsToggle && dom.tabsNav && dom.currentTabName) {
-    // Abrir/cerrar el dropdown de pestañas en móvil
-    dom.tabsToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dom.tabsNav.classList.toggle('hidden');
-    });
-
-    // Actualizar el nombre de la pestaña actual en el botón del dropdown
-    // y cerrar el dropdown al seleccionar una opción
-    dom.tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            // El texto del botón sin el icono
-            const buttonText = button.textContent.trim();
-            dom.currentTabName.textContent = buttonText;
-
-            // Ocultar el dropdown solo si estamos en vista móvil
-            if (getComputedStyle(dom.tabsToggle).display !== 'none') {
-                dom.tabsNav.classList.add('hidden');
-            }
-        });
-    });
-
-    // Cerrar el dropdown si se hace clic fuera de él
-    document.addEventListener('click', (e) => {
-        const isClickInsideNav = dom.tabsNav.contains(e.target);
-        const isClickOnToggle = dom.tabsToggle.contains(e.target);
-
-        if (!isClickInsideNav && !isClickOnToggle) {
-            dom.tabsNav.classList.add('hidden');
-        }
-    });
 }
 
 // --- Lógica de Exportación (JSON y PDF) ---
@@ -2427,6 +2395,40 @@ function openTab(tabName) {
   document.getElementById("tab-" + tabName).classList.add("active");
 }
 
+function createMindMapLegendPanel() {
+    const legendContainer = document.createElement('div');
+    legendContainer.id = 'mindMapLegendPanel';
+    legendContainer.className = 'hidden absolute top-full right-0 mt-2 bg-gray-800 bg-opacity-95 p-4 rounded-lg shadow-lg z-20 text-white text-xs w-48';
+
+    const title = document.createElement('h4');
+    title.className = 'font-bold mb-2 text-sm border-b border-gray-600 pb-1';
+    title.textContent = 'Leyenda de Nodos';
+    legendContainer.appendChild(title);
+
+    const legendItems = {
+        'Capítulos': { border: '#60a5fa', background: '#1e40af' },
+        'Personajes': { border: '#f87171', background: '#7f1d1d' },
+        'Lugares': { border: '#4ade80', background: '#166534' },
+        'Objetos': { border: '#fbbf24', background: '#854d0e' }
+    };
+
+    for (const [name, colors] of Object.entries(legendItems)) {
+        const item = document.createElement('div');
+        item.className = 'flex items-center mb-1';
+        const colorBox = document.createElement('div');
+        colorBox.className = 'w-4 h-4 rounded-sm mr-2 flex-shrink-0';
+        colorBox.style.backgroundColor = colors.background;
+        colorBox.style.border = `1px solid ${colors.border}`;
+        item.appendChild(colorBox);
+        const label = document.createElement('span');
+        label.textContent = name;
+        item.appendChild(label);
+        legendContainer.appendChild(item);
+    }
+    
+    return legendContainer;
+}
+
 // --- Lógica del Mapa Mental ---
 function initMindMap(project) {
   if (!project || typeof vis === 'undefined') {
@@ -2450,12 +2452,6 @@ function initMindMap(project) {
     interaction: {
       navigationButtons: true,
       keyboard: true
-    },
-    // Añadido para controlar la física de atracción/repulsión
-    configure: {
-        enabled: true,
-        filter: 'physics', // Mostrar solo opciones de física para simplicidad
-        showButton: true
     },
     physics: {
         enabled: true,
@@ -2540,6 +2536,54 @@ function initMindMap(project) {
 
   appState.mindMapNetwork = new vis.Network(dom.mindMapContainer, data, options);
 
+  // --- Creación y gestión de botones y paneles desplegables ---
+  const buttonContainer = dom.btnGenerateMindMap.parentNode;
+  if (!buttonContainer) return;
+
+  buttonContainer.style.position = 'relative'; // Necesario para los paneles absolutos
+
+  // Limpiar controles dinámicos de ejecuciones anteriores
+  document.getElementById('btnTogglePhysicsControls')?.remove();
+  document.getElementById('btnToggleMindMapLegend')?.remove();
+  document.getElementById('physicsControlsPanel')?.remove();
+  document.getElementById('mindMapLegendPanel')?.remove();
+
+  // Homogeneizar estilos de botones
+  const buttonBaseClass = 'bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm flex items-center justify-center';
+  dom.btnGenerateMindMap.className = buttonBaseClass;
+  dom.btnLinkNodes.className = buttonBaseClass;
+
+  // --- Panel y Botón de Leyenda ---
+  const legendPanel = createMindMapLegendPanel();
+  const legendToggleButton = document.createElement('button');
+  legendToggleButton.id = 'btnToggleMindMapLegend';
+  legendToggleButton.innerHTML = '<i class="fas fa-palette mr-2"></i> Leyenda';
+  legendToggleButton.className = buttonBaseClass;
+  buttonContainer.appendChild(legendToggleButton);
+  buttonContainer.appendChild(legendPanel);
+
+  // --- Panel y Botón de Física ---
+  const physicsPanel = createPhysicsControlsPanel();
+  const physicsToggleButton = document.createElement('button');
+  physicsToggleButton.id = 'btnTogglePhysicsControls';
+  physicsToggleButton.innerHTML = '<i class="fas fa-sliders-h mr-2"></i> Ajustar Física';
+  physicsToggleButton.className = buttonBaseClass;
+  buttonContainer.appendChild(physicsToggleButton);
+  buttonContainer.appendChild(physicsPanel);
+
+  // Asignar eventos a los botones de toggle
+  legendToggleButton.onclick = (e) => {
+      e.stopPropagation();
+      legendPanel.classList.toggle('hidden');
+      physicsPanel.classList.add('hidden'); // Ocultar el otro panel
+  };
+
+  physicsToggleButton.onclick = (e) => {
+      e.stopPropagation();
+      physicsPanel.classList.toggle('hidden');
+      legendPanel.classList.add('hidden'); // Ocultar el otro panel
+  };
+
   // Evento para mostrar detalles al hacer clic en un nodo
   appState.mindMapNetwork.on('click', function(params) {
     if (params.nodes.length > 0) {
@@ -2562,6 +2606,124 @@ function initMindMap(project) {
         }
     }
   });
+}
+
+function createPhysicsControlsPanel() {
+    const project = appState.projects[appState.currentProjectIndex];
+    if (!project || !appState.mindMapNetwork) return null;
+
+    const controlsContainer = document.createElement('div');
+    controlsContainer.id = 'physicsControlsPanel';
+    controlsContainer.className = 'hidden absolute top-full right-0 mt-2 bg-gray-800 bg-opacity-95 p-4 rounded-lg shadow-lg z-20 text-white text-xs w-64';
+
+    const title = document.createElement('h4');
+    title.className = 'font-bold mb-2 text-sm border-b border-gray-600 pb-1';
+    title.textContent = 'Ajustes de Física';
+    controlsContainer.appendChild(title);
+
+    const physicsOptions = appState.mindMapNetwork.options.physics || {};
+    const barnesHutOptions = physicsOptions.barnesHut || {
+        // Provide default values as a fallback, matching those in initMindMap
+        gravitationalConstant: -4000,
+        centralGravity: 0.3,
+        springLength: 120,
+        springConstant: 0.04,
+        damping: 0.09,
+        avoidOverlap: 0.2
+    };
+
+    const createControlRow = (label, key, value, step, min, max) => {
+        const row = document.createElement('div');
+        row.className = 'flex justify-between items-center mb-1';
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = label;
+        labelEl.className = 'flex-1';
+        row.appendChild(labelEl);
+
+        const valueContainer = document.createElement('div');
+        valueContainer.className = 'flex items-center gap-2';
+
+        const minusBtn = document.createElement('button');
+        minusBtn.textContent = '-';
+        minusBtn.className = 'bg-indigo-500 hover:bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center font-mono';
+        minusBtn.onclick = () => updatePhysics(key, -step, min, max);
+        valueContainer.appendChild(minusBtn);
+
+        const valueSpan = document.createElement('span');
+        valueSpan.id = `physics-value-${key}`;
+        valueSpan.textContent = value.toFixed(2);
+        valueSpan.className = 'w-10 text-center font-mono';
+        valueContainer.appendChild(valueSpan);
+
+        const plusBtn = document.createElement('button');
+        plusBtn.textContent = '+';
+        plusBtn.className = 'bg-indigo-500 hover:bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center font-mono';
+        plusBtn.onclick = () => updatePhysics(key, step, min, max);
+        valueContainer.appendChild(plusBtn);
+
+        row.appendChild(valueContainer);
+        controlsContainer.appendChild(row);
+    };
+
+    createControlRow('Gravedad', 'gravitationalConstant', barnesHutOptions.gravitationalConstant, 500, -20000, 0);
+    createControlRow('Grav. Central', 'centralGravity', barnesHutOptions.centralGravity, 0.05, 0, 1);
+    createControlRow('Long. Muelle', 'springLength', barnesHutOptions.springLength, 10, 50, 500);
+    createControlRow('Const. Muelle', 'springConstant', barnesHutOptions.springConstant, 0.01, 0.01, 0.5);
+    createControlRow('Amortiguación', 'damping', barnesHutOptions.damping, 0.05, 0, 1);
+    createControlRow('Solapamiento', 'avoidOverlap', barnesHutOptions.avoidOverlap, 0.1, 0, 1);
+
+    const reenableButton = document.createElement('button');
+    reenableButton.textContent = 'Re-estabilizar Nodos';
+    reenableButton.className = 'w-full bg-green-600 hover:bg-green-700 text-white text-xs py-1 mt-2 rounded';
+    reenableButton.onclick = () => {
+        if (appState.mindMapNetwork) {
+            appState.mindMapNetwork.setOptions({ physics: { enabled: true } });
+        }
+    };
+    controlsContainer.appendChild(reenableButton);
+
+    return controlsContainer;
+}
+
+function updatePhysics(key, change, min, max) {
+    if (!appState.mindMapNetwork) return;
+
+    // Corrected: vis.js Network object uses the .options property, not a getOptions() method.
+    // We read the current value from the live options.
+    const currentOptions = appState.mindMapNetwork.options;
+    const currentPhysicsOptions = currentOptions.physics || {};
+    const currentBarnesHutOptions = currentPhysicsOptions.barnesHut || {};
+
+    // Get current value, or a default if it's not defined
+    let currentValue = currentBarnesHutOptions[key];
+    if (typeof currentValue !== 'number') {
+        const defaultOptions = {
+            gravitationalConstant: -4000,
+            centralGravity: 0.3,
+            springLength: 120,
+            springConstant: 0.04,
+            damping: 0.09,
+            avoidOverlap: 0.2
+        };
+        currentValue = defaultOptions[key] || 0;
+    }
+
+    let newValue = currentValue + change;
+
+    // Clamp the value within min/max
+    if (min !== undefined) newValue = Math.max(min, newValue);
+    if (max !== undefined) newValue = Math.min(max, newValue);
+
+    // Pass only the changed options to setOptions. This is safer and how the API is designed to be used.
+    // It merges the new options with the existing ones.
+    appState.mindMapNetwork.setOptions({ physics: { enabled: true, barnesHut: { [key]: newValue } } });
+
+    // Update the displayed value
+    const valueSpan = document.getElementById(`physics-value-${key}`);
+    if (valueSpan) {
+        valueSpan.textContent = newValue.toFixed(2);
+    }
 }
 
 async function generateMindMapFromContent() {
@@ -2590,29 +2752,99 @@ async function generateMindMapFromContent() {
     await saveProjects();
 }
 
+if (dom.sidebar && dom.sidebarToggle) {
+  const toggleSidebar = (e) => {
+    // Detiene la propagación para evitar que el listener del documento se active inmediatamente
+    e.stopPropagation();
+    dom.sidebar.classList.toggle('-translate-x-full');
+  };
+
+  dom.sidebarToggle.addEventListener('click', toggleSidebar);
+  dom.sidebarToggle.addEventListener('touchend', (e) => {
+    e.preventDefault(); // Previene el "ghost click" y el zoom no deseado
+    toggleSidebar(e);
+  });
+
+  // Cierra el sidebar si se hace clic fuera de él en vista móvil
+  const closeSidebarOnClickOutside = (e) => {
+    const isClickInsideSidebar = dom.sidebar.contains(e.target);
+    const isClickOnToggle = dom.sidebarToggle.contains(e.target);
+
+    // Si el sidebar está abierto y el clic fue fuera de él y del botón de toggle
+    if (!dom.sidebar.classList.contains('-translate-x-full') && !isClickInsideSidebar && !isClickOnToggle) {
+      // Solo cierra si el botón de toggle es visible (estamos en móvil)
+      if (getComputedStyle(dom.sidebarToggle).display !== 'none') {
+        dom.sidebar.classList.add('-translate-x-full');
+      }
+    }
+  };
+  document.addEventListener('click', closeSidebarOnClickOutside);
+  document.addEventListener('touchend', closeSidebarOnClickOutside);
+}
+
 // --- Botones Añadir ---
 if (dom.btnAddChapter) dom.btnAddChapter.onclick = () => openModal('chapters');
 if (dom.btnAddCharacter) dom.btnAddCharacter.onclick = () => openModal('characters');
 if (dom.btnAddPlace) dom.btnAddPlace.onclick = () => openModal('places');
 if (dom.btnAddObject) dom.btnAddObject.onclick = () => openModal('objects');
 
-// --- Tabs ---
-dom.tabButtons.forEach((btn) => {
-  btn.onclick = () => {
-    dom.tabButtons.forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    dom.tabContents.forEach((c) => c.classList.remove('active'));
-    document
-      .getElementById('tab-' + btn.dataset.tab)
-      .classList.add('active');
-    
-    appState.currentTab = btn.dataset.tab;
-    if (appState.currentTab === 'mindmap') {
-      const project = appState.projects[appState.currentProjectIndex];
-      initMindMap(project);
+// --- Lógica de Pestañas Unificada ---
+function openTab(tabName) {
+    if (!tabName) return;
+
+    // 1. Actualizar estado de los botones
+    dom.tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+
+    // 2. Mostrar el contenido de la pestaña correcta
+    dom.tabContents.forEach(c => c.classList.toggle('active', c.id === `tab-${tabName}`));
+
+    // 3. Actualizar estado global
+    appState.currentTab = tabName;
+
+    // 4. Lógica especial para el mapa mental
+    if (tabName === 'mindmap') {
+        const project = appState.projects[appState.currentProjectIndex];
+        initMindMap(project);
     }
-  };
+
+    // 5. Actualizar UI del dropdown móvil
+    if (dom.tabsToggle && dom.currentTabName && dom.tabsNav) {
+        const activeButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+        if (activeButton) {
+            dom.currentTabName.textContent = activeButton.textContent.trim();
+        }
+        // Ocultar el dropdown si estamos en vista móvil
+        if (getComputedStyle(dom.tabsToggle).display !== 'none') {
+            dom.tabsNav.classList.add('hidden');
+        }
+    }
+}
+
+// --- Asignación de Eventos ---
+
+// 1. Asignar evento a todos los botones de pestaña
+dom.tabButtons.forEach(btn => {
+    const tabName = btn.dataset.tab;
+    const handleEvent = (e) => { e.stopPropagation(); openTab(tabName); };
+    btn.addEventListener('click', handleEvent);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); handleEvent(e); });
 });
+
+// 2. Lógica para el dropdown móvil (solo abrir/cerrar)
+if (dom.tabsToggle && dom.tabsNav) {
+    const toggleTabsNav = (e) => { e.stopPropagation(); dom.tabsNav.classList.toggle('hidden'); };
+    dom.tabsToggle.addEventListener('click', toggleTabsNav);
+    dom.tabsToggle.addEventListener('touchend', (e) => { e.preventDefault(); toggleTabsNav(e); });
+
+    // 3. Cerrar el dropdown si se hace clic/toca fuera de él
+    const closeOnClickOutside = (e) => {
+        if (!dom.tabsNav.contains(e.target) && !dom.tabsToggle.contains(e.target)) {
+            dom.tabsNav.classList.add('hidden');
+        }
+    };
+    document.addEventListener('click', closeOnClickOutside);
+    document.addEventListener('touchend', closeOnClickOutside);
+}
 
 // --- MANEJO DE EVENTOS DEL MENÚ DE EXPORTACIÓN ---
 if (dom.btnGenerateMindMap) dom.btnGenerateMindMap.onclick = generateMindMapFromContent;
@@ -2695,29 +2927,3 @@ window.addEventListener('resize', () => {
         }, 200);
     }
 });
-
-// --- Lógica para la barra lateral responsive ---
-const sidebar = document.getElementById('sidebar');
-const sidebarToggle = document.getElementById('sidebar-toggle');
-
-if (sidebar && sidebarToggle) {
-  sidebarToggle.addEventListener('click', (e) => {
-    // Detiene la propagación para evitar que el listener del documento se active inmediatamente
-    e.stopPropagation();
-    sidebar.classList.toggle('-translate-x-full');
-  });
-
-  // Cierra el sidebar si se hace clic fuera de él en vista móvil
-  document.addEventListener('click', (e) => {
-    const isClickInsideSidebar = sidebar.contains(e.target);
-    const isClickOnToggle = sidebarToggle.contains(e.target);
-
-    // Si el sidebar está abierto y el clic fue fuera de él y del botón de toggle
-    if (!sidebar.classList.contains('-translate-x-full') && !isClickInsideSidebar && !isClickOnToggle) {
-      // Solo cierra si el botón de toggle es visible (estamos en móvil)
-      if (getComputedStyle(sidebarToggle).display !== 'none') {
-        sidebar.classList.add('-translate-x-full');
-      }
-    }
-  });
-}

@@ -249,7 +249,7 @@
   </aside>
 
   <!-- Main Content -->
-  <main class="flex-grow flex flex-col overflow-y-auto">
+  <main class="flex-grow flex flex-col overflow-y-auto relative z-10">
     <div id="welcomeScreen" class="flex-grow flex flex-col items-center justify-center text-center">
       <h2 class="text-4xl font-bold mb-4">¡Bienvenido!</h2>
       <p class="text-gray-400 mb-6">Comienza un nuevo proyecto o selecciona uno existente para empezar a diseñar tu historia.</p>
@@ -257,7 +257,7 @@
     </div>
 
     <div id="projectScreen" class="hidden flex-grow flex flex-col p-4 md:p-8">
-      <header class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+      <header class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4 relative z-20">
         <div class="flex items-center space-x-4">
           <h2 id="nombreProyecto" class="text-3xl md:text-4xl font-bold text-white"></h2>
           <button id="btnEditarNombre" class="text-indigo-400 hover:text-indigo-300"><i class="fas fa-edit"></i></button>
@@ -270,7 +270,7 @@
                 <i class="fas fa-chevron-down ml-2"></i>
             </button>
             <!-- Navegación de pestañas -->
-            <nav id="tabs-nav" class="hidden md:flex flex-col md:flex-row md:space-x-2 md:p-1 bg-[#1A1A1A] rounded-lg md:rounded-full absolute md:relative w-full md:w-auto mt-2 md:mt-0 z-20">
+            <nav id="tabs-nav" class="hidden md:flex flex-col md:flex-row md:space-x-2 md:p-1 bg-[#1A1A1A] rounded-lg md:rounded-full absolute md:relative w-full md:w-auto mt-2 md:mt-0 z-30">
               <button data-tab="dashboard" class="tab-button active w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-chart-line mr-1"></i>Dashboard</button>
               <button data-tab="chapters" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-book mr-1"></i>Capítulos</button>
               <button data-tab="characters" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-users mr-1"></i>Personajes</button>
@@ -414,28 +414,9 @@
               <button id="btnLinkNodes" class="btn btn-secondary">
                 <i class="fas fa-link mr-2"></i>Enlazar Nodos
               </button>
-              <span class="text-gray-400 text-sm">Usa los botones del mapa para añadir, editar o enlazar nodos.</span>
+              <span class="text-gray-400 text-sm"></span>
           </div>
           <div id="mindMapContainer" class="w-full h-[80vh] border border-gray-700 rounded-lg bg-[#1A1A1A]"></div>
-          <div id="mindmap-legend" class="absolute top-20 right-4 bg-[#1A1A1A] p-3 rounded-lg shadow-lg border border-gray-700 text-sm z-10">
-              <h4 class="font-bold mb-2 text-white">Leyenda</h4>
-              <div class="flex items-center mb-1">
-                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #1e40af; border: 1px solid #60a5fa;"></span>
-                  <span class="text-gray-300">Capítulos</span>
-              </div>
-              <div class="flex items-center mb-1">
-                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #7f1d1d; border: 1px solid #f87171;"></span>
-                  <span class="text-gray-300">Personajes</span>
-              </div>
-              <div class="flex items-center mb-1">
-                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #166534; border: 1px solid #4ade80;"></span>
-                  <span class="text-gray-300">Lugares</span>
-              </div>
-              <div class="flex items-center">
-                  <span class="w-4 h-4 rounded-full mr-2" style="background-color: #854d0e; border: 1px solid #fbbf24;"></span>
-                  <span class="text-gray-300">Objetos</span>
-              </div>
-          </div>
       </div>
     </div>
   </main>
