@@ -11,7 +11,8 @@ let appState = {
   characterAgeChartInstance: null, // Instancia del gráfico de edades
   characterGenderChartInstance: null, // Instancia del gráfico de géneros
   placeTypeChartInstance: null, // Instancia del gráfico de tipos de lugar
-  objectTypeChartInstance: null // Instancia del gráfico de tipos de objeto
+  objectTypeChartInstance: null, // Instancia del gráfico de tipos de objeto
+  ratingAnalysisChartInstance: null // Instancia del gráfico de calificaciones
 };
 
 // --- Cache DOM ---
@@ -154,10 +155,13 @@ const dom = {
   btnEditarNombre: document.getElementById('btnEditarNombre'),
   btnEliminarProyecto: document.getElementById('btnEliminarProyecto'),
   // Mapa Mental
+  btnVerPublico: document.getElementById('btnVerPublico'),
   mindMapContainer: document.getElementById('mindMapContainer'),
   btnGenerateMindMap: document.getElementById('btnGenerateMindMap'),
   btnLinkNodes: document.getElementById('btnLinkNodes'),
   // Dashboard Features
+  // Comments Management
+  commentsManagementList: document.getElementById('commentsManagementList'),
   featuredCharactersContainer: document.getElementById('featuredCharactersContainer'),
   featuredPlacesContainer: document.getElementById('featuredPlacesContainer'),
   featuredObjectsContainer: document.getElementById('featuredObjectsContainer'),
@@ -169,6 +173,8 @@ const dom = {
   placeTypeChart: document.getElementById('placeTypeChart'),
   objectTypeChartContainer: document.getElementById('objectTypeChartContainer'),
   objectTypeChart: document.getElementById('objectTypeChart'),
+  ratingAnalysisContainer: document.getElementById('ratingAnalysisContainer'),
+  ratingAnalysisChart: document.getElementById('ratingAnalysisChart'),
   sidebar: document.getElementById('sidebar'),
   sidebarToggle: document.getElementById('sidebar-toggle'),
 };
@@ -176,10 +182,21 @@ const dom = {
 // --- Gestión de datos (IndexedDB) ---
 let db;
 async function initDB() {
-    db = await idb.openDB('story-creator-db', 1, {
+    db = await idb.openDB('story-creator-db', 2, {
         upgrade(db) {
             if (!db.objectStoreNames.contains('projects')) {
                 db.createObjectStore('projects');
+            }
+            // Añadir los object stores que faltan para consistencia con historia.js
+            if (!db.objectStoreNames.contains('ratings')) {
+                const store = db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
+                // Índice para asegurar que un usuario solo califique un ítem una vez.
+                store.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
+            }
+            if (!db.objectStoreNames.contains('comments')) {
+                const store = db.createObjectStore('comments', { keyPath: 'id', autoIncrement: true });
+                store.createIndex('by_project', 'projectId');
+                store.createIndex('by_user', 'userEmail');
             }
         },
     });
@@ -197,21 +214,54 @@ async function saveProjects() {
 async function loadProjects() {
   await initDB();
   const stored = await db.get('projects', 'allProjects');
-  appState.projects = stored || [];
+  const loadedProjects = stored || [];
   // Asegurar compatibilidad y ordenar datos
-  appState.projects.forEach(p => {
+  const tx = db.transaction(['projects', 'comments'], 'readwrite');
+  const commentsStore = tx.objectStore('comments');
+  let needsSave = false;
+  
+  // FIX: Usar map para crear un nuevo array con los proyectos actualizados.
+  // forEach no es ideal para modificar la estructura de los elementos mientras se itera.
+  const migrationPromises = loadedProjects.map(async p => {
+    if (!p.id) {
+      p.id = generateId(); // Asignar ID si no existe
+      needsSave = true;
+    }
+    // --- MIGRACIÓN DE COMENTARIOS ---
+    // Mueve los comentarios del formato antiguo (array en el proyecto) al nuevo (tabla 'comments')
+    if (p.comments && p.comments.length > 0) {
+        console.log(`Migrando ${p.comments.length} comentarios para el proyecto ${p.name}`);
+        for (const oldComment of p.comments) {
+            await commentsStore.add({
+                projectId: p.id,
+                userEmail: oldComment.name, // El campo antiguo se llamaba 'name'
+                message: oldComment.message,
+                timestamp: new Date(oldComment.date).getTime()
+            });
+        }
+        p.comments = []; // Vaciar el array antiguo
+        needsSave = true;
+    }
     if (!p.mindMap) {
       p.mindMap = { nodes: [], edges: [] };
     }
     if (typeof p.descripcionLarga === 'undefined') {
-        p.descripcionLarga = '';
+      p.descripcionLarga = '';
     }
     // Ordenar capítulos por el campo 'order'
     if (p.chapters) {
       p.chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
     }
+    return p; // Devolver el proyecto (potencialmente modificado)
   });
+
+  appState.projects = await Promise.all(migrationPromises);
+  await tx.done;
+
   renderProjectsList();
+  if (needsSave) {
+    await saveProjects(); // Guardar los proyectos si se añadieron nuevos IDs
+  }
   if (appState.projects.length > 0) {
     selectProject(0);
   } else {
@@ -227,11 +277,47 @@ const toBase64 = file => new Promise((resolve, reject) => {
     reader.onerror = error => reject(error);
 });
 
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
 const urlToBase64 = async (url) => {
     const response = await fetch(url, { cache: 'no-store' }); // Evitar caché para obtener nuevas imágenes
     const blob = await response.blob();
     return toBase64(blob);
 };
+
+/**
+ * Añade un event listener seguro para 'click' y 'touchend', evitando la doble ejecución.
+ * @param {HTMLElement} element El elemento al que se le añadirá el listener.
+ * @param {Function} handler La función que se ejecutará.
+ */
+function addSafeEventListener(element, handler) {
+    if (!element) return;
+
+    // Flag para evitar la doble ejecución en dispositivos táctiles
+    let touchHandled = false;
+
+    const touchendHandler = (e) => {
+        // Prevenimos el 'click' fantasma que sigue a un 'touchend'
+        e.preventDefault();
+        handler(e);
+        touchHandled = true;
+        // Reseteamos el flag después de un breve período
+        setTimeout(() => {
+            touchHandled = false;
+        }, 300);
+    };
+
+    const clickHandler = (e) => {
+        // Si el evento de 'touchend' ya se disparó, no ejecutamos el de 'click'
+        if (touchHandled) return;
+        handler(e);
+    };
+
+    element.addEventListener('touchend', touchendHandler, { passive: false });
+    element.addEventListener('click', clickHandler);
+}
 
 // --- Render ---
 function showWelcomeScreen() {
@@ -532,6 +618,70 @@ function renderProjectDetails() {
                   }]
               },
               options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } } } }
+          });
+      }
+  }
+
+  // --- Lógica para Gráfico de Calificaciones ---
+  const calculateCategoryAverage = (items) => {
+      if (!items || items.length === 0) return { average: 0, count: 0 };
+      let totalRating = 0;
+      let ratingCount = 0;
+      items.forEach(item => {
+          if (item.ratings && item.ratings.length > 0) {
+              totalRating += item.ratings.reduce((sum, r) => sum + r, 0);
+              ratingCount += item.ratings.length;
+          }
+      });
+      return { average: ratingCount > 0 ? totalRating / ratingCount : 0, count: ratingCount };
+  };
+
+  const projectRatings = project.ratings || [];
+  const projectAvg = projectRatings.length > 0 ? projectRatings.reduce((s, r) => s + r, 0) / projectRatings.length : 0;
+  const chaptersAvg = calculateCategoryAverage(project.chapters).average;
+  const charactersAvg = calculateCategoryAverage(project.characters).average;
+  const placesAvg = calculateCategoryAverage(project.places).average;
+  const objectsAvg = calculateCategoryAverage(project.objects).average;
+
+  const ratingData = [projectAvg, chaptersAvg, charactersAvg, placesAvg, objectsAvg];
+  const hasRatings = ratingData.some(r => r > 0);
+
+  if (!hasRatings) {
+      dom.ratingAnalysisContainer.classList.add('hidden');
+      if (appState.ratingAnalysisChartInstance) {
+          appState.ratingAnalysisChartInstance.destroy();
+          appState.ratingAnalysisChartInstance = null;
+      }
+  } else {
+      dom.ratingAnalysisContainer.classList.remove('hidden');
+      const labels = ['Proyecto General', 'Capítulos', 'Personajes', 'Lugares', 'Objetos'];
+      
+      if (appState.ratingAnalysisChartInstance) {
+          appState.ratingAnalysisChartInstance.data.datasets[0].data = ratingData;
+          appState.ratingAnalysisChartInstance.update();
+      } else {
+          const ctx = dom.ratingAnalysisChart.getContext('2d');
+          appState.ratingAnalysisChartInstance = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                  labels: labels,
+                  datasets: [{
+                      label: 'Calificación Promedio (de 1 a 5)',
+                      data: ratingData,
+                      backgroundColor: ['rgba(239, 68, 68, 0.7)', 'rgba(59, 130, 246, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(34, 197, 94, 0.7)', 'rgba(168, 85, 247, 0.7)'],
+                      borderColor: '#1f2937',
+                      borderWidth: 2
+                  }]
+              },
+              options: {
+                  indexAxis: 'y',
+                  responsive: true, maintainAspectRatio: false,
+                  scales: {
+                      x: { beginAtZero: true, max: 5, ticks: { color: '#d1d5db' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                      y: { ticks: { color: '#d1d5db' }, grid: { display: false } }
+                  },
+                  plugins: { legend: { display: false } }
+              }
           });
       }
   }
@@ -1542,6 +1692,97 @@ async function exportProjectToHTML(proyecto) {
     URL.revokeObjectURL(url);
 }
 
+async function exportProjectToKDP(proyecto) {
+    if (!proyecto) {
+        alert('No hay un proyecto seleccionado para exportar.');
+        return;
+    }
+
+    // Estilos optimizados para la conversión de KDP, imitando un formato de libro estándar.
+    const styles = `
+        body { font-family: "Times New Roman", Times, serif; line-height: 1.6; margin: 2em; }
+        h1, h2, h3 { font-family: "Georgia", serif; page-break-after: avoid; }
+        h1 { font-size: 2.5em; text-align: center; margin-bottom: 2em; }
+        h2 { font-size: 2em; margin-top: 2em; margin-bottom: 1em; page-break-before: always; border-bottom: 1px solid #ccc; padding-bottom: 0.2em;}
+        h3 { font-size: 1.5em; margin-top: 1.5em; margin-bottom: 0.5em; }
+        p { margin-bottom: 1em; text-align: justify; text-indent: 1.5em; }
+        img { max-width: 100%; height: auto; display: block; margin: 1em auto; }
+        .cover-image { width: 60%; max-width: 400px; margin-bottom: 2em; page-break-after: always; }
+        .toc { list-style: none; padding: 0; margin-bottom: 2em; page-break-after: always; }
+        .toc li { margin-bottom: 0.5em; }
+        .toc li a { text-decoration: none; color: #0000EE; }
+        .item-list-entry { margin-bottom: 1.5em; page-break-inside: avoid; }
+        .item-list-entry img { max-width: 150px; float: left; margin-right: 1em; margin-bottom: 0.5em; }
+        .clearfix::after { content: ""; clear: both; display: table; }
+        /* No indent for first paragraph after a heading */
+        h2 + p, h3 + p { text-indent: 0; }
+    `;
+
+    let html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${proyecto.name}</title><style>${styles}</style></head><body>`;
+
+    // 1. Portada
+    html += `<div style="text-align: center;">`;
+    if (proyecto.coverImage) {
+        html += `<img src="${proyecto.coverImage}" alt="Portada" class="cover-image">`;
+    }
+    html += `<h1>${proyecto.name}</h1>`;
+    html += `</div>`;
+
+    // 2. Tabla de Contenidos
+    html += `<h2>Índice</h2><ul class="toc">`;
+    if (proyecto.chapters.length > 0) {
+        proyecto.chapters.forEach(chap => {
+            const chapterId = `chapter-${chap.id || generateId()}`;
+            html += `<li><a href="#${chapterId}">${chap.order ? `Capítulo ${chap.order}: ` : ''}${chap.name}</a></li>`;
+        });
+    }
+    if (proyecto.characters.length > 0) html += `<li><a href="#appendix-characters">Personajes</a></li>`;
+    if (proyecto.places.length > 0) html += `<li><a href="#appendix-places">Lugares</a></li>`;
+    if (proyecto.objects.length > 0) html += `<li><a href="#appendix-objects">Objetos</a></li>`;
+    html += `</ul>`;
+
+    // 3. Capítulos
+    if (proyecto.chapters.length > 0) {
+        proyecto.chapters.forEach(chap => {
+            const chapterId = `chapter-${chap.id || generateId()}`;
+            html += `<h2 id="${chapterId}">${chap.order ? `Capítulo ${chap.order}: ` : ''}${chap.name}</h2>`;
+            if (chap.image) {
+                html += `<img src="${chap.image}" alt="${chap.name}">`;
+            }
+            if (chap.description) {
+                const paragraphs = chap.description.split('\n').filter(p => p.trim() !== '').map(p => `<p>${p.trim()}</p>`).join('');
+                html += paragraphs;
+            }
+        });
+    }
+
+    // 4. Apéndices (Personajes, Lugares, Objetos)
+    const renderAppendix = (title, anchor, items) => {
+        if (!items || items.length === 0) return '';
+        let sectionHtml = `<h2 id="${anchor}">${title}</h2>`;
+        items.forEach(item => {
+            sectionHtml += `<div class="item-list-entry clearfix">${item.image ? `<img src="${item.image}" alt="${item.name}">` : ''}<h3>${item.name}</h3>${item.description ? `<p>${item.description.replace(/\n/g, '<br>')}</p>` : ''}</div>`;
+        });
+        return sectionHtml;
+    };
+
+    html += renderAppendix('Personajes', 'appendix-characters', proyecto.characters);
+    html += renderAppendix('Lugares', 'appendix-places', proyecto.places);
+    html += renderAppendix('Objetos', 'appendix-objects', proyecto.objects);
+
+    html += `</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${proyecto.name.replace(/\s/g, '_')}_KDP.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 // --- Importar proyectos ---
 if (dom.btnImportar) {
   dom.btnImportar.onclick = () => {
@@ -1605,6 +1846,16 @@ function selectProject(index) {
   appState.currentProjectIndex = index;
   renderProjectsList();
   showProjectScreen();
+
+  // --- LÓGICA PARA EL BOTÓN DE VISTA PÚBLICA ---
+  const project = appState.projects[appState.currentProjectIndex];
+  if (project && project.id) {
+      dom.btnVerPublico.href = `historia.html?project=${project.id}`;
+      dom.btnVerPublico.classList.remove('hidden');
+  } else {
+      dom.btnVerPublico.classList.add('hidden');
+  }
+
   renderProjectDetails();
 }
 
@@ -1613,12 +1864,13 @@ async function newProject() {
   const name = prompt('Nombre del proyecto:');
   if (!name) return;
   appState.projects.push({
+    id: generateId(),
     name,
     chapters: [],
     characters: [],
     descripcionLarga: '',
     places: [],
-    objects: [],
+    objects: [],    
     mindMap: { nodes: [], edges: [] }
   });
   await saveProjects();
@@ -2365,35 +2617,10 @@ if (dom.btnEliminarProyecto) {
 // --- Dashboard ----
 
 // --- Accesos rápidos desde el Dashboard ---
-if (dom.totalChapters) {
-  dom.totalChapters.parentElement.onclick = () => {
-    openTab("chapters");
-  };
-}
-if (dom.totalCharacters) {
-  dom.totalCharacters.parentElement.onclick = () => {
-    openTab("characters");
-  };
-}
-if (dom.totalPlaces) {
-  dom.totalPlaces.parentElement.onclick = () => {
-    openTab("places");
-  };
-}
-if (dom.totalObjects) {
-  dom.totalObjects.parentElement.onclick = () => {
-    openTab("objects");
-  };
-}
-
-function openTab(tabName) {
-  dom.tabButtons.forEach((b) => {
-    b.classList.remove("active");
-    if (b.dataset.tab === tabName) b.classList.add("active");
-  });
-  dom.tabContents.forEach((c) => c.classList.remove("active"));
-  document.getElementById("tab-" + tabName).classList.add("active");
-}
+if (dom.totalChapters) addSafeEventListener(dom.totalChapters.parentElement, () => openTab("chapters"));
+if (dom.totalCharacters) addSafeEventListener(dom.totalCharacters.parentElement, () => openTab("characters"));
+if (dom.totalPlaces) addSafeEventListener(dom.totalPlaces.parentElement, () => openTab("places"));
+if (dom.totalObjects) addSafeEventListener(dom.totalObjects.parentElement, () => openTab("objects"));
 
 function createMindMapLegendPanel() {
     const legendContainer = document.createElement('div');
@@ -2635,52 +2862,77 @@ function createPhysicsControlsPanel() {
     const createControlRow = (label, key, value, step, min, max) => {
         const row = document.createElement('div');
         row.className = 'flex justify-between items-center mb-1';
-
+ 
         const labelEl = document.createElement('label');
         labelEl.textContent = label;
         labelEl.className = 'flex-1';
         row.appendChild(labelEl);
-
+ 
         const valueContainer = document.createElement('div');
         valueContainer.className = 'flex items-center gap-2';
-
+ 
+        let intervalId = null;
+ 
+        const startChangingValue = (change) => {
+            if (intervalId) return; // Evitar múltiples intervalos
+            updatePhysics(key, change, min, max); // Cambio inmediato al hacer clic
+            intervalId = setInterval(() => {
+                updatePhysics(key, change, min, max);
+            }, 100); // Repetir cada 100ms
+        };
+ 
+        const stopChangingValue = () => {
+            clearInterval(intervalId);
+            intervalId = null;
+        };
+ 
         const minusBtn = document.createElement('button');
         minusBtn.textContent = '-';
-        minusBtn.className = 'bg-indigo-500 hover:bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center font-mono';
-        minusBtn.onclick = () => updatePhysics(key, -step, min, max);
+        minusBtn.className = 'bg-indigo-500 hover:bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center font-mono select-none';
+        minusBtn.addEventListener('mousedown', () => startChangingValue(-step));
+        minusBtn.addEventListener('mouseup', stopChangingValue);
+        minusBtn.addEventListener('mouseleave', stopChangingValue);
+        minusBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startChangingValue(-step); });
+        minusBtn.addEventListener('touchend', stopChangingValue);
+        minusBtn.addEventListener('touchcancel', stopChangingValue);
         valueContainer.appendChild(minusBtn);
-
+ 
         const valueSpan = document.createElement('span');
         valueSpan.id = `physics-value-${key}`;
         valueSpan.textContent = value.toFixed(2);
         valueSpan.className = 'w-10 text-center font-mono';
         valueContainer.appendChild(valueSpan);
-
+ 
         const plusBtn = document.createElement('button');
         plusBtn.textContent = '+';
-        plusBtn.className = 'bg-indigo-500 hover:bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center font-mono';
-        plusBtn.onclick = () => updatePhysics(key, step, min, max);
+        plusBtn.className = 'bg-indigo-500 hover:bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center font-mono select-none';
+        plusBtn.addEventListener('mousedown', () => startChangingValue(step));
+        plusBtn.addEventListener('mouseup', stopChangingValue);
+        plusBtn.addEventListener('mouseleave', stopChangingValue);
+        plusBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startChangingValue(step); });
+        plusBtn.addEventListener('touchend', stopChangingValue);
+        plusBtn.addEventListener('touchcancel', stopChangingValue);
         valueContainer.appendChild(plusBtn);
-
+ 
         row.appendChild(valueContainer);
         controlsContainer.appendChild(row);
     };
 
-    createControlRow('Gravedad', 'gravitationalConstant', barnesHutOptions.gravitationalConstant, 500, -20000, 0);
-    createControlRow('Grav. Central', 'centralGravity', barnesHutOptions.centralGravity, 0.05, 0, 1);
-    createControlRow('Long. Muelle', 'springLength', barnesHutOptions.springLength, 10, 50, 500);
-    createControlRow('Const. Muelle', 'springConstant', barnesHutOptions.springConstant, 0.01, 0.01, 0.5);
-    createControlRow('Amortiguación', 'damping', barnesHutOptions.damping, 0.05, 0, 1);
-    createControlRow('Solapamiento', 'avoidOverlap', barnesHutOptions.avoidOverlap, 0.1, 0, 1);
+    createControlRow('Gravedad', 'gravitationalConstant', barnesHutOptions.gravitationalConstant, 250, -100000, 0);
+    createControlRow('Grav. Central', 'centralGravity', barnesHutOptions.centralGravity, 0.02, 0, 5);
+    createControlRow('Long. Muelle', 'springLength', barnesHutOptions.springLength, 5, 10, 1200);
+    createControlRow('Const. Muelle', 'springConstant', barnesHutOptions.springConstant, 0.005, 0.01, 2);
+    createControlRow('Amortiguación', 'damping', barnesHutOptions.damping, 0.005, 0, 1);
+    createControlRow('Solapamiento', 'avoidOverlap', barnesHutOptions.avoidOverlap, 0.02, 0, 5);
 
     const reenableButton = document.createElement('button');
     reenableButton.textContent = 'Re-estabilizar Nodos';
     reenableButton.className = 'w-full bg-green-600 hover:bg-green-700 text-white text-xs py-1 mt-2 rounded';
-    reenableButton.onclick = () => {
+    addSafeEventListener(reenableButton, () => {
         if (appState.mindMapNetwork) {
             appState.mindMapNetwork.setOptions({ physics: { enabled: true } });
         }
-    };
+    });
     controlsContainer.appendChild(reenableButton);
 
     return controlsContainer;
@@ -2715,9 +2967,10 @@ function updatePhysics(key, change, min, max) {
     if (min !== undefined) newValue = Math.max(min, newValue);
     if (max !== undefined) newValue = Math.min(max, newValue);
 
-    // Pass only the changed options to setOptions. This is safer and how the API is designed to be used.
-    // It merges the new options with the existing ones.
-    appState.mindMapNetwork.setOptions({ physics: { enabled: true, barnesHut: { [key]: newValue } } });
+    // FIX: Se crea un nuevo objeto con todas las opciones actuales de barnesHut y se actualiza solo la clave específica.
+    // Esto evita que setOptions sobrescriba las demás configuraciones de física, ya que realiza una combinación superficial.
+    const newBarnesHutOptions = { ...currentBarnesHutOptions, [key]: newValue };
+    appState.mindMapNetwork.setOptions({ physics: { enabled: true, barnesHut: newBarnesHutOptions } });
 
     // Update the displayed value
     const valueSpan = document.getElementById(`physics-value-${key}`);
@@ -2807,6 +3060,11 @@ function openTab(tabName) {
         initMindMap(project);
     }
 
+    // 6. Lógica para la gestión de comentarios
+    if (tabName === 'comments') {
+        renderCommentsManagement();
+    }
+
     // 5. Actualizar UI del dropdown móvil
     if (dom.tabsToggle && dom.currentTabName && dom.tabsNav) {
         const activeButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
@@ -2818,6 +3076,64 @@ function openTab(tabName) {
             dom.tabsNav.classList.add('hidden');
         }
     }
+}
+
+async function renderCommentsManagement() {
+    const container = dom.commentsManagementList;
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // 1. Obtener todos los comentarios de la base de datos
+    const allComments = await db.getAll('comments');
+
+    // Crear un mapa para buscar nombres de proyectos eficientemente
+    const projectNames = new Map(appState.projects.map(p => [p.id, p.name]));
+
+    // Ordenar por fecha, los más nuevos primero
+    allComments.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (allComments.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">No hay comentarios en ningún proyecto.</p>';
+        return;
+    }
+
+    // 2. Renderizar cada comentario
+    allComments.forEach(comment => {
+        const commentCard = document.createElement('div');
+        commentCard.className = 'bg-[#242424] p-4 rounded-lg border border-gray-700 flex flex-col md:flex-row justify-between items-start gap-4';
+        const commentDate = new Date(comment.timestamp).toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const projectName = projectNames.get(comment.projectId) || 'Proyecto Desconocido';
+
+        commentCard.innerHTML = `
+            <div class="flex-grow">
+                <p class="text-gray-300 whitespace-pre-wrap">"${comment.message}"</p>
+                <p class="text-sm text-gray-500 mt-2">
+                    Por <strong class="text-indigo-400">${comment.userEmail}</strong> en el proyecto 
+                    <strong class="text-green-400">${projectName}</strong>
+                    <span class="ml-2">(${commentDate})</span>
+                </p>
+            </div>
+            <div class="flex-shrink-0 flex gap-2 mt-2 md:mt-0">
+                <button class="delete-comment-btn bg-red-800 hover:bg-red-700 text-white text-xs py-1 px-3 rounded-md" data-comment-id="${comment.id}">
+                    <i class="fas fa-trash-alt mr-1"></i> Eliminar
+                </button>
+            </div>
+        `;
+        container.appendChild(commentCard);
+    });
+
+    // 3. Añadir event listeners para los botones de eliminar (usando el ID del comentario)
+    container.querySelectorAll('.delete-comment-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const commentId = parseInt(e.currentTarget.dataset.commentId, 10);
+            
+            if (confirm('¿Estás seguro de que quieres eliminar este comentario permanentemente?')) {
+                await db.delete('comments', commentId);
+                renderCommentsManagement(); // Re-renderizar la lista
+            }
+        };
+    });
 }
 
 // --- Asignación de Eventos ---
@@ -2860,6 +3176,7 @@ const exportOptions = document.getElementById('export-options');
 const btnExportarJSON = document.getElementById('btnExportarJSON');
 const btnExportarPDF = document.getElementById('btnExportarPDF');
 const btnExportarHTML = document.getElementById('btnExportarHTML');
+const btnExportarKDP = document.getElementById('btnExportarKDP');
 
 if (btnToggleExport) {
     btnToggleExport.addEventListener('click', (e) => {
@@ -2907,6 +3224,19 @@ if (btnExportarHTML) {
             await exportProjectToHTML(project);
         } else {
             alert('Por favor, selecciona un proyecto para exportar a HTML.');
+        }
+        if (exportOptions) exportOptions.classList.add('hidden');
+    });
+}
+
+if (btnExportarKDP) {
+    btnExportarKDP.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const project = appState.projects[appState.currentProjectIndex];
+        if (project) {
+            await exportProjectToKDP(project);
+        } else {
+            alert('Por favor, selecciona un proyecto para exportar para KDP.');
         }
         if (exportOptions) exportOptions.classList.add('hidden');
     });

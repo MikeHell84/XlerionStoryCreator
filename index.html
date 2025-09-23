@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Xlerion Story Creator</title>
+  <title>Xlerion Stories</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -235,16 +235,35 @@
     <div class="flex-grow overflow-y-auto pr-2">
       <ul id="listaProyectos" class="space-y-3"></ul>
     </div>
-    <div class="space-y-2 pt-4 border-t border-gray-700 relative">
-      <div id="export-menu-container" class="relative">
-        <button id="btnToggleExport" class="btn btn-secondary w-full flex justify-center items-center"><i class="fas fa-file-export mr-2"></i> Exportar <i class="fas fa-chevron-up ml-auto text-xs"></i></button>
-        <div id="export-options" class="hidden absolute bottom-full mb-2 w-full bg-[#242424] rounded-lg shadow-lg border border-gray-600 z-10">
-            <a href="#" id="btnExportarJSON" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-t-lg">Exportar a JSON</a>
-            <a href="#" id="btnExportarHTML" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Exportar a HTML</a>
-            <a href="#" id="btnExportarPDF" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-b-lg">Exportar a PDF</a>
+    <div class="space-y-2 pt-4 border-t border-gray-700">
+      <!-- Botón de Vista Pública (ahora ocupa todo el ancho y está separado) -->
+      <a id="btnVerPublico" href="#" target="_blank" class="btn btn-secondary w-full hidden flex items-center justify-center"><i class="fas fa-eye mr-2"></i> Ver Vista Pública</a>
+      
+      <!-- Contenedor Flex para Importar y Exportar con diseño apilado -->
+      <div class="flex items-stretch gap-2">
+        <!-- Botón de Importar con icono y texto apilados -->
+        <button id="btnImportar" class="btn btn-secondary flex-1 flex flex-col items-center justify-center p-2 text-xs h-auto rounded-xl">
+          <i class="fas fa-file-import text-lg mb-1"></i>
+          <span>Importar</span>
+        </button>
+        
+        <!-- Botón de Exportar (con menú) con icono y texto apilados -->
+        <div id="export-menu-container" class="relative flex-1">
+          <button id="btnToggleExport" class="btn btn-secondary w-full h-full flex flex-col items-center justify-center p-2 text-xs rounded-xl">
+            <i class="fas fa-file-export text-lg mb-1"></i>
+            <div class="flex items-center">
+                <span>Exportar</span>
+                <i class="fas fa-chevron-up ml-1 text-base"></i>
+            </div>
+          </button>
+          <div id="export-options" class="hidden absolute bottom-full mb-2 w-full bg-[#242424] rounded-lg shadow-lg border border-gray-600 z-10">
+              <a href="#" id="btnExportarJSON" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-t-lg">Exportar a JSON</a>
+              <a href="#" id="btnExportarHTML" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Exportar a HTML (Web)</a>
+              <a href="#" id="btnExportarPDF" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Exportar a PDF</a>
+              <a href="#" id="btnExportarKDP" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-b-lg">Exportar para KDP (HTML)</a>
+          </div>
         </div>
       </div>
-      <button id="btnImportar" class="btn btn-secondary w-full"><i class="fas fa-file-import mr-2"></i> Importar</button>
     </div>
   </aside>
 
@@ -277,6 +296,7 @@
               <button data-tab="places" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-map-marker-alt mr-1"></i>Lugares</button>
               <button data-tab="objects" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-box mr-1"></i>Objetos</button>
               <button data-tab="mindmap" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-project-diagram mr-1"></i>Mapa Mental</button>
+              <button data-tab="comments" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-comments mr-1"></i>Comentarios</button>
             </nav>
         </div>
       </header>
@@ -362,6 +382,11 @@
                     <h4 class="text-xl font-semibold mb-4 text-orange-400">Distribución de Objetos (Tipo)</h4>
                     <div class="relative h-96"><canvas id="objectTypeChart"></canvas></div>
                 </div>
+                <!-- NUEVO: Análisis de Calificaciones -->
+                <div id="ratingAnalysisContainer" class="card p-6 md:col-span-2 lg:col-span-3 hidden">
+                    <h4 class="text-xl font-semibold mb-4 text-yellow-400">Análisis de Calificaciones Promedio</h4>
+                    <div class="relative h-96"><canvas id="ratingAnalysisChart"></canvas></div>
+                </div>
             </div>
         </div>
 
@@ -417,6 +442,15 @@
               <span class="text-gray-400 text-sm"></span>
           </div>
           <div id="mindMapContainer" class="w-full h-[80vh] border border-gray-700 rounded-lg bg-[#1A1A1A]"></div>
+      </div>
+
+      <!-- Gestión de Comentarios -->
+      <div id="tab-comments" class="tab-content overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold">Gestión de Comentarios</h3>
+          <!-- Podríamos añadir filtros o un botón de recarga aquí en el futuro -->
+        </div>
+        <div id="commentsManagementList" class="space-y-4"></div>
       </div>
     </div>
   </main>
