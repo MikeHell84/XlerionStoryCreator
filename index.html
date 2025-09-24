@@ -21,6 +21,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
+  <!-- JSZip y FileSaver para exportar a Web (ZIP) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
   <!-- Chart.js para gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -223,6 +227,9 @@
 
 <body class="flex h-screen overflow-hidden">
 
+  <!-- Input oculto para la importación de archivos JSON -->
+  <input type="file" id="importJsonInput" class="hidden" accept=".json">
+
   <!-- Botón para mostrar/ocultar la barra lateral en móviles -->
   <button id="sidebar-toggle" class="md:hidden fixed top-4 left-4 z-50 p-2 bg-indigo-600 text-white rounded-md shadow-lg">
     <i class="fas fa-bars text-xl"></i>
@@ -258,7 +265,7 @@
           </button>
           <div id="export-options" class="hidden absolute bottom-full mb-2 w-full bg-[#242424] rounded-lg shadow-lg border border-gray-600 z-10">
               <a href="#" id="btnExportarJSON" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-t-lg">Exportar a JSON</a>
-              <a href="#" id="btnExportarHTML" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Exportar a HTML (Web)</a>
+              <a href="#" id="btnPublicarWeb" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Publicar (Web)</a>
               <a href="#" id="btnExportarPDF" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600">Exportar a PDF</a>
               <a href="#" id="btnExportarKDP" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-600 rounded-b-lg">Exportar para KDP (HTML)</a>
           </div>
@@ -347,17 +354,17 @@
             <h3 class="text-2xl font-bold mb-6">Elementos Destacados</h3>
             
             <h4 class="text-xl font-semibold mb-4 text-indigo-400">Personajes Aleatorios</h4>
-            <div id="featuredCharactersContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+            <div id="featuredCharactersContainer" data-type="character" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
                 <!-- JS poblará esto -->
             </div>
 
             <h4 class="text-xl font-semibold mb-4 text-green-400">Lugares Aleatorios</h4>
-            <div id="featuredPlacesContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+            <div id="featuredPlacesContainer" data-type="place" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
                 <!-- JS poblará esto -->
             </div>
 
             <h4 class="text-xl font-semibold mb-4 text-yellow-400">Objetos Aleatorios</h4>
-            <div id="featuredObjectsContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+            <div id="featuredObjectsContainer" data-type="object" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
                 <!-- JS poblará esto -->
             </div>
         </div>
@@ -432,14 +439,21 @@
 
       <!-- Mapa Mental -->
       <div id="tab-mindmap" class="tab-content relative min-h-0"> <!-- FIX: min-h-0 es crucial para el layout de flexbox anidado y evita la expansión infinita -->
-          <div id="mindmap-toolbar" class="p-4 bg-[#1A1A1A] border-b border-gray-700 flex items-center gap-4">
+          <div id="mindmap-toolbar" class="p-4 bg-[#1A1A1A] border-b border-gray-700 flex flex-wrap items-center gap-4">
               <button id="btnGenerateMindMap" class="btn btn-primary">
                   <i class="fas fa-cogs mr-2"></i>Generar desde Contenido
               </button>
               <button id="btnLinkNodes" class="btn btn-secondary">
                 <i class="fas fa-link mr-2"></i>Enlazar Nodos
               </button>
+              <button id="btnPhysicsConfig" class="btn btn-secondary">
+                <i class="fas fa-atom mr-2"></i>Ajustar Físicas
+              </button>
               <span class="text-gray-400 text-sm"></span>
+          </div>
+          <!-- Leyenda del Mapa Mental -->
+          <div id="mindmap-legend" class="p-2 bg-[#1A1A1A] border-b border-gray-700 flex items-center justify-center gap-x-6 gap-y-2 flex-wrap text-gray-300">
+              <!-- La leyenda se generará aquí con JS -->
           </div>
           <div id="mindMapContainer" class="w-full h-[80vh] border border-gray-700 rounded-lg bg-[#1A1A1A]"></div>
       </div>
@@ -867,6 +881,9 @@
 
   <!-- Script -->
   <script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>
+  <!-- Cargar los datos de ejemplo para que la app pueda inicializar la base de datos -->
+  <!-- DEBE cargarse ANTES de app.js -->
+  <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

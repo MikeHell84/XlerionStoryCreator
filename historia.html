@@ -14,8 +14,8 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 
     <!-- Librerías para el Mapa Mental -->
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript" src="./libs/vis-network.min.js"></script>
+    <link href="./libs/vis-network.min.css" rel="stylesheet" type="text/css" />
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #111827; color: #E5E7EB; }
@@ -76,7 +76,7 @@
         <div class="container mx-auto flex justify-between items-center p-4">
             <a href="#" id="logo-link" class="flex items-center gap-3 cursor-pointer">
                 <img src="favicon.ico" alt="Logo" class="h-8 w-8">
-                <span class="text-xl font-bold text-white">Xlerion Stories</span>
+                <span class="text-xl font-bold text-white">Xlerion´s Stories</span>
             </a>
             <div class="flex items-center gap-6">
                 <nav class="hidden md:flex items-center gap-6">
@@ -84,18 +84,7 @@
                     <a href="#" id="nav-about-link" class="nav-link text-gray-300">Acerca de</a>
                     <a href="#" id="nav-contact-link" class="nav-link text-gray-300">Contacto</a>
                 </nav>
-                <!-- User/Login section -->
-                <div id="user-session" class="flex items-center gap-4">
-                    <button id="loginBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                        <i class="fas fa-sign-in-alt mr-2"></i> Iniciar Sesión
-                    </button>
-                    <div id="userInfo" class="hidden items-center gap-3">
-                        <span id="userEmail" class="text-sm text-gray-300"></span>
-                        <button id="logoutBtn" class="text-gray-400 hover:text-white" title="Cerrar Sesión">
-                            <i class="fas fa-sign-out-alt text-lg"></i>
-                        </button>
-                    </div>
-                </div>
+                <!-- La sección de Login se elimina en la vista pública estática -->
             </div>
         </div>
     </header>
@@ -143,13 +132,7 @@
             <div class="text-center">
             <img id="projectCover" src="" alt="Portada del Proyecto" class="w-full max-w-2xl mx-auto h-auto object-cover rounded-lg shadow-2xl mb-6 hidden">
                 <h1 id="projectTitle" class="text-4xl md:text-6xl font-bold tracking-tight text-white"></h1>
-                <!-- Contenedor para la Calificación del Proyecto -->
-                <div id="projectRatingContainer" class="mt-4">
-                    <div id="projectRating" class="flex items-center justify-center"></div>
-                    <p id="ratingLoginPrompt" class="text-center text-sm text-gray-400 mt-2 hidden">
-                        <a href="#" id="ratingLoginLink" class="text-indigo-400 hover:underline">Inicia sesión</a> para calificar este proyecto.
-                    </p>
-                </div>
+                <!-- La calificación se elimina en la vista estática, ya que requiere una base de datos -->
             </div>
         </header>
 
@@ -197,38 +180,7 @@
             <div id="publicMindMapContainer" class="w-full h-[60vh] border border-gray-700 rounded-lg bg-gray-800"></div>
         </section>
 
-        <!-- NUEVO: Sección de Comentarios -->
-        <section id="commentsSection" class="mt-16">
-            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Comentarios</h2>
-            
-            <!-- Formulario para nuevos comentarios -->
-            <div id="commentFormContainer" class="bg-gray-800 p-6 rounded-lg mb-8">
-                <h3 class="text-xl font-bold mb-4">Deja tu comentario</h3>
-                <form id="commentForm" class="space-y-4 hidden">
-                    <div>
-                        <label for="commenterName" class="block text-sm font-medium text-gray-300 mb-1">Tu Correo</label>
-                        <input type="email" id="commenterName" required class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 cursor-not-allowed" readonly>
-                    </div>
-                    <div>
-                        <label for="commentMessage" class="block text-sm font-medium text-gray-300 mb-1">Mensaje</label>
-                        <textarea id="commentMessage" rows="4" required class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-                    </div>
-                    <div class="text-right">
-                        <button type="submit" id="submitCommentBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Publicar Comentario
-                        </button>
-                    </div>
-                </form>
-                <div id="commentLoginPrompt" class="hidden">
-                    <p class="text-gray-300">
-                        <a href="#" id="commentLoginLink" class="text-indigo-400 hover:underline font-semibold">Inicia sesión</a> para dejar un comentario.
-                    </p>
-                </div>
-            </div>
-    
-            <!-- Lista de comentarios existentes -->
-            <div id="commentsList" class="space-y-6"></div>
-        </section>
+        <!-- La sección de comentarios se elimina en la vista estática, ya que requiere una base de datos -->
     </main>
 
     <!-- Modal de Detalles -->
@@ -239,15 +191,7 @@
                 <button id="btnCloseDetails" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
             </div>
             <div id="detailsBody" class="p-6 overflow-y-auto"></div>
-            <!-- Contenedor para la calificación del ítem -->
-            <div class="p-6 border-t border-gray-700 flex-shrink-0">
-                <h4 class="text-lg font-semibold text-indigo-300 mb-2">Califica este elemento</h4>
-                <div id="detailsRatingContent">
-                </div>
-                <p id="detailsRatingLoginPrompt" class="text-center text-sm text-gray-400 mt-2 hidden">
-                    <a href="#" id="detailsRatingLoginLink" class="text-indigo-400 hover:underline">Inicia sesión</a> para calificar.
-                </p>
-            </div>
+            <!-- La calificación de ítems se elimina en la vista estática -->
         </div>
     </div>
 
@@ -260,32 +204,6 @@
             </div>
             <div id="staticContentBody" class="p-6 overflow-y-auto prose prose-custom lg:prose-xl max-w-none">
                 <!-- El contenido estático se inyectará aquí -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Login Modal -->
-    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm">
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
-                <h3 class="text-xl font-bold text-white">Iniciar Sesión / Registrarse</h3>
-                <button id="closeLoginModal" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
-            </div>
-            <div class="p-6">
-                <p class="text-gray-400 mb-4">Ingresa tu correo electrónico para calificar y dejar comentarios. No se necesita contraseña.</p>
-                <form id="loginForm">
-                    <div class="space-y-4">
-                        <div>
-                            <label for="loginEmailInput" class="block text-sm font-medium text-gray-300 mb-1">Correo Electrónico</label>
-                            <input type="email" id="loginEmailInput" required class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="tu@correo.com">
-                        </div>
-                        <div class="text-right">
-                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                                Ingresar
-                            </button>
-                        </div>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -333,7 +251,9 @@
         </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>
-    <script type="module" src="historia.js"></script>
+    <!-- El archivo data.js será generado por la función de exportación y contendrá todos los datos del proyecto -->
+    <script src="data.js" defer></script>
+    <!-- historia.js ahora leerá desde data.js en lugar de una base de datos -->
+    <script src="historia.js" defer></script>
 </body>
 </html>

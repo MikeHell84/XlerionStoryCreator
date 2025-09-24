@@ -155,6 +155,7 @@ const dom = {
   btnEditarNombre: document.getElementById('btnEditarNombre'),
   btnEliminarProyecto: document.getElementById('btnEliminarProyecto'),
   // Mapa Mental
+  btnPublicarWeb: document.getElementById('btnPublicarWeb'),
   btnVerPublico: document.getElementById('btnVerPublico'),
   mindMapContainer: document.getElementById('mindMapContainer'),
   btnGenerateMindMap: document.getElementById('btnGenerateMindMap'),
@@ -1781,6 +1782,81 @@ async function exportProjectToKDP(proyecto) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+async function publicarProyectoWeb() {
+    // 1. Obtener el proyecto y validar
+    const project = appState.projects[appState.currentProjectIndex];
+    if (!project) {
+        alert('Por favor, selecciona un proyecto para publicar.');
+        return;
+    }
+
+    const originalButtonText = dom.btnPublicarWeb.innerHTML;
+    dom.btnPublicarWeb.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Publicando...';
+    dom.btnPublicarWeb.disabled = true;
+
+    try {
+        // 2. Obtener comentarios y preparar los datos del proyecto
+        const projectComments = await db.getAllFromIndex('comments', 'by_project', project.id);
+        const projectToExport = JSON.parse(JSON.stringify(project));
+        projectToExport.comments = projectComments.map(c => ({
+            userEmail: c.userEmail,
+            message: c.message
+        }));
+
+        // 3. Generar el contenido de 'data.js' en memoria
+        const dataJsContent = `window.allProjectsData = ${JSON.stringify([projectToExport], null, 2)};`;
+
+        // 4. Función para obtener el contenido de los archivos necesarios
+        const fetchAsset = async (path) => {
+            const response = await fetch(path);
+            if (!response.ok) throw new Error(`No se pudo cargar el archivo: ${path}`);
+            return response.text();
+        };
+
+        // 5. Cargar los assets necesarios
+        const historiaHtmlContent = await fetchAsset("historia.html");
+        const historiaJsContent = await fetchAsset("historia.js");
+        const visNetworkJsContent = await fetchAsset("https://unpkg.com/vis-network/standalone/umd/vis-network.min.js");
+        const visNetworkCssContent = await fetchAsset("https://unpkg.com/vis-network/styles/vis-network.min.css");
+
+        // 6. Construir el HTML final en memoria
+        let finalHtml = historiaHtmlContent;
+
+        // Reemplazar las referencias a archivos externos con el contenido en línea
+        finalHtml = finalHtml.replace('<script type="text/javascript" src="./libs/vis-network.min.js"></script>', `<script>${visNetworkJsContent}</script>`);
+        finalHtml = finalHtml.replace('<link href="./libs/vis-network.min.css" rel="stylesheet" type="text/css" />', `<style>${visNetworkCssContent}</style>`);
+        finalHtml = finalHtml.replace('<script src="data.js" defer></script>', `<script>${dataJsContent}</script>`);
+        finalHtml = finalHtml.replace('<script src="historia.js" defer></script>', `<script>${historiaJsContent}</script>`);
+
+        // 7. Crear un Blob y una URL para el HTML generado
+        const blob = new Blob([finalHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+
+        // 8. Abrir la URL en una nueva pestaña
+        window.open(url, '_blank');
+        // No es necesario revocar la URL inmediatamente, el navegador la gestionará.
+
+    } catch (error) {
+        console.error("Error al publicar el proyecto:", error);
+        alert(`Ocurrió un error al generar el archivo de publicación: ${error.message}`);
+    } finally {
+        // Restaurar el botón
+        dom.btnPublicarWeb.innerHTML = originalButtonText;
+        dom.btnPublicarWeb.disabled = false;
+        const exportOptions = document.getElementById('export-options');
+        if (exportOptions) {
+            exportOptions.classList.add('hidden');
+        }
+    }
+}
+
+if (dom.btnPublicarWeb) {
+    dom.btnPublicarWeb.addEventListener('click', (e) => {
+        e.preventDefault();
+        publicarProyectoWeb();
+    });
 }
 
 // --- Importar proyectos ---
