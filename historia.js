@@ -293,6 +293,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         detailsBody.innerHTML = bodyHtml;
         detailsModal.classList.remove('hidden');
+
+        // --- CORRECCIÓN: Asignar evento de cierre aquí ---
+        // Se asigna el evento cada vez que se abre el modal para asegurar que funcione.
+        const btnClose = document.getElementById('btnCloseDetails');
+        if (btnClose) {
+            // Usamos .onclick para reemplazar cualquier listener anterior y evitar duplicados.
+            btnClose.onclick = () => {
+                detailsModal.classList.add('hidden');
+            };
+        }
     }
 
     // --- Lógica para el modal de contenido estático (Acerca de, Contacto, etc.) ---
@@ -540,37 +550,53 @@ document.addEventListener('DOMContentLoaded', () => {
         // Ocultar el loader y mostrar el contenido principal
         // Se hace al principio para que el usuario vea algo mientras se procesan los datos.
         loadingScreen.classList.add('hidden');
-        projectSelectionScreen.classList.remove('hidden');
         try {
-            // --- LÓGICA DE CARGA DE DATOS MEJORADA ---
+            // --- LÓGICA DE CARGA DE DATOS REESTRUCTURADA ---
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('projectId');
-
-            // 1. MODO JSON EXTERNO: Intentar cargar desde data.json (prioridad más alta)
+ 
+            // Prioridad 1: Cargar desde data.json (modo público principal)
             try {
                 const response = await fetch('data.json');
                 if (response.ok) {
                     allProjects = await response.json();
+                    // Si se carga desde data.json, no necesitamos la lógica de projectId.
+                    // La página mostrará la lista de proyectos para que el visitante elija.
+                } else {
+                    // Si data.json no existe o falla, continuamos con los otros métodos.
+                    console.warn('data.json no encontrado o no accesible. Intentando otros métodos de carga.');
                 }
             } catch (e) {
-                // No hacer nada si el archivo no existe, simplemente continuará con los otros métodos.
-                console.log('data.json no encontrado, continuando con otros métodos de carga.');
+                console.warn('Error al buscar data.json:', e);
             }
 
-            // 2. MODO VISTA PÚBLICA (si no se cargó desde JSON)
-            if (allProjects.length === 0 && projectId) {
+
+            // Prioridad 2: Cargar desde IndexedDB si se pasa un projectId en la URL.
+            // Este es el modo "dinámico" que solicitaste.
+            if (projectId) {
                 await initDB();
-                const allStoredProjects = await db.get('projects', 'allProjects');
-                if (allStoredProjects) {
-                    const projectToShow = allStoredProjects.find(p => p.id === projectId);
+                // FIX: Se obtienen los proyectos y comentarios de la base de datos.
+                // Los proyectos se guardan como un array bajo la clave 'allProjects'.
+                const storedProjects = await db.get('projects', 'allProjects');
+                const storedComments = await db.getAll('comments');
+ 
+                if (storedProjects && storedProjects.length > 0) {
+                    const projectToShow = storedProjects.find(p => p.id === projectId);
                     if (projectToShow) {
-                        allProjects = [projectToShow];
-                    }
+                        allProjects = storedProjects;
+                        currentProject = projectToShow;
+                        // Mapear comentarios para el slider, añadiendo el nombre del proyecto.
+                        allComments = storedComments.map(c => ({
+                            ...c,
+                            author: c.userEmail, // Adaptar el nombre del campo
+                            projectName: allProjects.find(p => p.id === c.projectId)?.name || 'Desconocido'
+                        }));
+                        renderProject(currentProject);
+                        return; // Salir para no mostrar la lista de proyectos.
+                    } 
                 }
-            }
-            // 3. MODO PUBLICADO (si no se cargó desde JSON ni por ID)
-            else if (allProjects.length === 0 && window.allProjectsData) {
-                 allProjects = window.allProjectsData;
+            } else if (window.allProjectsData) { // Prioridad 3: Modo publicado (archivo HTML autónomo con datos incrustados)
+                allProjects = window.allProjectsData;
             }
 
             if (allProjects && allProjects.length > 0) {
@@ -596,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 renderProjectList();
+                projectSelectionScreen.classList.remove('hidden');
             } else {
                  projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2><p class="text-gray-400 mt-2">No se pudo cargar la información del proyecto. Vuelve a la aplicación principal e inténtalo de nuevo.</p>`;
             }
@@ -614,12 +641,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Asignación de Eventos Centralizada ---
         backToProjectsBtn.addEventListener('click', showProjectSelection);
-        btnCloseDetails.addEventListener('click', () => detailsModal.classList.add('hidden'));
-        detailsModal.addEventListener('click', (e) => {
-            if (e.target.id === 'detailsModal') {
-                detailsModal.classList.add('hidden');
-            }
-        });
 
         // Eventos para el modal de contenido estático
         if (btnCloseStaticContent) {

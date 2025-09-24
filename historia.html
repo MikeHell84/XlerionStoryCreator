@@ -14,8 +14,11 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 
     <!-- Librerías para el Mapa Mental -->
-    <script type="text/javascript" src="./libs/vis-network.min.js"></script>
-    <link href="./libs/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+
+    <!-- Librería para IndexedDB (necesaria para la vista pública dinámica) -->
+    <script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #111827; color: #E5E7EB; }
@@ -253,6 +256,6 @@
     
     <!-- El script historia.js ahora cargará los datos desde data.json si existe, o usará los datos inyectados. -->
     <!-- historia.js ahora leerá desde data.js en lugar de una base de datos -->
-    <script src="historia.js" defer></script>
+    <script src="historia.js"></script>
 </body>
 </html>
