@@ -213,55 +213,65 @@ async function saveProjects() {
   }
 }
 async function loadProjects() {
-  await initDB();
-  const stored = await db.get('projects', 'allProjects');
-  const loadedProjects = stored || [];
-  // Asegurar compatibilidad y ordenar datos
-  const tx = db.transaction(['projects', 'comments'], 'readwrite');
-  const commentsStore = tx.objectStore('comments');
-  let needsSave = false;
-  
-  // FIX: Usar map para crear un nuevo array con los proyectos actualizados.
-  // forEach no es ideal para modificar la estructura de los elementos mientras se itera.
-  const migrationPromises = loadedProjects.map(async p => {
-    if (!p.id) {
-      p.id = generateId(); // Asignar ID si no existe
-      needsSave = true;
-    }
-    // --- MIGRACIÓN DE COMENTARIOS ---
-    // Mueve los comentarios del formato antiguo (array en el proyecto) al nuevo (tabla 'comments')
-    if (p.comments && p.comments.length > 0) {
-        console.log(`Migrando ${p.comments.length} comentarios para el proyecto ${p.name}`);
-        for (const oldComment of p.comments) {
-            await commentsStore.add({
-                projectId: p.id,
-                userEmail: oldComment.name, // El campo antiguo se llamaba 'name'
-                message: oldComment.message,
-                timestamp: new Date(oldComment.date).getTime()
-            });
+    await initDB();
+    let loadedProjects = [];
+    let loadedFromServer = false;
+
+    // 1. Intentar cargar desde el servidor (data.json) como fuente principal.
+    try {
+        const response = await fetch('data.json', { cache: 'no-store' }); // no-store para obtener siempre la última versión
+        if (response.ok) {
+            loadedProjects = await response.json();
+            loadedFromServer = true;
+            console.log('Proyectos cargados exitosamente desde el servidor.');
+        } else {
+            console.warn('No se encontró data.json en el servidor o hubo un error. Se intentará cargar desde la base de datos local.');
         }
-        p.comments = []; // Vaciar el array antiguo
-        needsSave = true;
+    } catch (error) {
+        console.error('Error al intentar cargar data.json. Se intentará cargar desde la base de datos local.', error);
     }
-    if (!p.mindMap) {
-      p.mindMap = { nodes: [], edges: [] };
+
+    // 2. Si no se pudo cargar desde el servidor, cargar desde IndexedDB.
+    if (!loadedFromServer) {
+        const stored = await db.get('projects', 'allProjects');
+        loadedProjects = stored || [];
+        console.log('Proyectos cargados desde la base de datos local.');
     }
-    if (typeof p.descripcionLarga === 'undefined') {
-      p.descripcionLarga = '';
-    }
-    // Ordenar capítulos por el campo 'order'
-    if (p.chapters) {
-      p.chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
-    }
-    return p; // Devolver el proyecto (potencialmente modificado)
-  });
+
+    // 3. Asegurar compatibilidad y migrar datos si es necesario (como antes).
+    const tx = db.transaction(['projects', 'comments'], 'readwrite');
+    const commentsStore = tx.objectStore('comments');
+    let needsSaveToDb = loadedFromServer; // Si cargamos del servidor, hay que guardarlo en la BD local.
+
+    const migrationPromises = loadedProjects.map(async p => {
+        if (!p.id) {
+            p.id = generateId();
+            needsSaveToDb = true;
+        }
+        // La migración de comentarios se mantiene por si se carga un proyecto antiguo.
+        if (p.comments && Array.isArray(p.comments) && p.comments.length > 0) {
+            console.log(`Migrando ${p.comments.length} comentarios para el proyecto ${p.name}`);
+            for (const oldComment of p.comments) {
+                await commentsStore.add({
+                    projectId: p.id,
+                    userEmail: oldComment.userEmail || 'Anónimo',
+                    message: oldComment.message,
+                    timestamp: oldComment.timestamp || Date.now()
+                });
+            }
+            p.comments = []; // Vaciar el array antiguo para no volver a migrarlo.
+            needsSaveToDb = true;
+        }
+        if (p.chapters) p.chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
+        return p;
+    });
 
   appState.projects = await Promise.all(migrationPromises);
   await tx.done;
 
   renderProjectsList();
-  if (needsSave) {
-    await saveProjects(); // Guardar los proyectos si se añadieron nuevos IDs
+  if (needsSaveToDb) {
+    await saveProjects(); // Guardar en IndexedDB si hubo cambios o se cargó desde el servidor.
   }
   if (appState.projects.length > 0) {
     selectProject(0);
