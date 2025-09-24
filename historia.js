@@ -515,6 +515,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Inicialización ---
     async function init() {
+        // Ocultar el loader y mostrar el contenido principal
+        // Se hace al principio para que el usuario vea algo mientras se procesan los datos.
+        loadingScreen.classList.add('hidden');
+        projectSelectionScreen.classList.remove('hidden');
         try {
             // Los datos ahora se cargan desde la variable global `window.allProjectsData`
             // que es inyectada por la aplicación principal al publicar.
@@ -544,8 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2><p class="text-gray-400 mt-2">Asegúrate de que el archivo 'data.js' exista y contenga los datos exportados desde la aplicación principal.</p>`;
             }
 
-            loadingScreen.classList.add('hidden');
-            projectSelectionScreen.classList.remove('hidden');
         } catch (error) {
             console.error('Error al cargar los proyectos:', error);
             storyContent.innerHTML = `
