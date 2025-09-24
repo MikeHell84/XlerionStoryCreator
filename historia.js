@@ -546,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('projectId');
 
-            // 1. MODO JSON EXTERNO: Intentar cargar desde data.json
+            // 1. MODO JSON EXTERNO: Intentar cargar desde data.json (prioridad más alta)
             try {
                 const response = await fetch('data.json');
                 if (response.ok) {
