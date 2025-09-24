@@ -21,8 +21,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const staticContentBody = document.getElementById('staticContentBody');
     const btnCloseStaticContent = document.getElementById('btnCloseStaticContent');
     
-    // La lógica de la base de datos (IndexedDB) se elimina.
-    // Los datos ahora se cargarán desde un archivo `data.js`.
+    // --- Gestión de datos (IndexedDB) ---
+    // La base de datos se usa para "Ver Vista Pública", mientras que
+    // `window.allProjectsData` se usa para los archivos publicados.
+    let db;
+    async function initDB() {
+        // Reutilizamos la configuración de la base de datos de app.js
+        // para asegurar la consistencia.
+        db = await idb.openDB('story-creator-db', 2, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains('projects')) {
+                    db.createObjectStore('projects');
+                }
+                if (!db.objectStoreNames.contains('ratings')) {
+                    const store = db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
+                }
+                if (!db.objectStoreNames.contains('comments')) {
+                    const store = db.createObjectStore('comments', { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('by_project', 'projectId');
+                    store.createIndex('by_user', 'userEmail');
+                }
+            },
+        });
+    }
 
     // --- Lógica de Renderizado ---
 
@@ -520,10 +542,44 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingScreen.classList.add('hidden');
         projectSelectionScreen.classList.remove('hidden');
         try {
-            // Los datos ahora se cargan desde la variable global `window.allProjectsData`
-            // que es inyectada por la aplicación principal al publicar.
-            if (window.allProjectsData) {
-                allProjects = window.allProjectsData;
+            // --- LÓGICA DE CARGA DE DATOS MEJORADA ---
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectId = urlParams.get('projectId');
+
+            // 1. MODO JSON EXTERNO: Intentar cargar desde data.json
+            try {
+                const response = await fetch('data.json');
+                if (response.ok) {
+                    allProjects = await response.json();
+                }
+            } catch (e) {
+                // No hacer nada si el archivo no existe, simplemente continuará con los otros métodos.
+                console.log('data.json no encontrado, continuando con otros métodos de carga.');
+            }
+
+            // 2. MODO VISTA PÚBLICA (si no se cargó desde JSON)
+            if (allProjects.length === 0 && projectId) {
+                await initDB();
+                const allStoredProjects = await db.get('projects', 'allProjects');
+                if (allStoredProjects) {
+                    const projectToShow = allStoredProjects.find(p => p.id === projectId);
+                    if (projectToShow) {
+                        allProjects = [projectToShow];
+                    }
+                }
+            }
+            // 3. MODO PUBLICADO (si no se cargó desde JSON ni por ID)
+            else if (allProjects.length === 0 && window.allProjectsData) {
+                 allProjects = window.allProjectsData;
+            }
+
+            if (allProjects && allProjects.length > 0) {
+                // Si solo hay un proyecto (como en el caso de la vista pública), muéstralo directamente.
+                // También aplica si solo hay un proyecto en data.json
+                if (allProjects.length === 1) {
+                    selectAndRenderProject(allProjects[0].id);
+                    return; // Salimos para no mostrar la lista de proyectos
+                }
 
                 // Poblar el array de comentarios para el slider
                 allComments = [];
@@ -539,13 +595,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                if (allProjects.length > 0) {
-                    renderProjectList();
-                } else {
-                    projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2>`;
-                }
+                renderProjectList();
             } else {
-                 projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2><p class="text-gray-400 mt-2">Asegúrate de que el archivo 'data.js' exista y contenga los datos exportados desde la aplicación principal.</p>`;
+                 projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2><p class="text-gray-400 mt-2">No se pudo cargar la información del proyecto. Vuelve a la aplicación principal e inténtalo de nuevo.</p>`;
             }
 
         } catch (error) {

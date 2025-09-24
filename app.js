@@ -1818,6 +1818,7 @@ async function publicarProyectoWeb() {
         // 5. Cargar los assets necesarios
         const historiaHtmlContent = await fetchAsset("historia.html");
         const historiaJsContent = await fetchAsset("historia.js");
+        // Cargar las librerías desde la CDN para asegurar que siempre estén disponibles.
         const visNetworkJsContent = await fetchAsset("https://unpkg.com/vis-network/standalone/umd/vis-network.min.js");
         const visNetworkCssContent = await fetchAsset("https://unpkg.com/vis-network/styles/vis-network.min.css");
 
@@ -1928,20 +1929,22 @@ function renderList(container, items, type) {
   });
 }
 function selectProject(index) {
-  appState.currentProjectIndex = index;
-  renderProjectsList();
-  showProjectScreen();
+    appState.currentProjectIndex = index;
+    renderProjectsList();
+    showProjectScreen();
 
-  // --- LÓGICA PARA EL BOTÓN DE VISTA PÚBLICA ---
-  const project = appState.projects[appState.currentProjectIndex];
-  if (project && project.id) {
-      dom.btnVerPublico.href = `historia.html?project=${project.id}`;
-      dom.btnVerPublico.classList.remove('hidden');
-  } else {
-      dom.btnVerPublico.classList.add('hidden');
-  }
+    // --- LÓGICA MEJORADA PARA EL BOTÓN DE VISTA PÚBLICA ---
+    // Ahora simplemente pasamos el ID del proyecto por la URL.
+    const project = appState.projects[appState.currentProjectIndex];
+    if (project && project.id) {
+        dom.btnVerPublico.href = `historia.html?projectId=${project.id}`;
+        dom.btnVerPublico.target = '_blank'; // Asegura que se abra en una nueva pestaña
+        dom.btnVerPublico.classList.remove('hidden');
+    } else {
+        dom.btnVerPublico.classList.add('hidden');
+    }
 
-  renderProjectDetails();
+    renderProjectDetails();
 }
 
 // --- Crear proyecto ---
