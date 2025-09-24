@@ -514,29 +514,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Inicialización ---
-    function init() {
+    async function init() {
         try {
-            // Lee los datos del proyecto desde la variable global definida en `data.js`
-            allProjects = window.allProjectsData || [];
+            // Los datos ahora se cargan desde la variable global `window.allProjectsData`
+            // que es inyectada por la aplicación principal al publicar.
+            if (window.allProjectsData) {
+                allProjects = window.allProjectsData;
 
-            // Poblar el array de comentarios para el slider
-            allComments = []; // Limpiar antes de poblar
-            allProjects.forEach(project => {
-                if (project.comments && project.comments.length > 0) {
-                    project.comments.forEach(comment => {
-                        allComments.push({
-                            message: comment.message,
-                            author: comment.userEmail, // El objeto exportado usa 'userEmail'
-                            projectName: project.name
+                // Poblar el array de comentarios para el slider
+                allComments = [];
+                allProjects.forEach(project => {
+                    if (project.comments && project.comments.length > 0) {
+                        project.comments.forEach(comment => {
+                            allComments.push({
+                                message: comment.message,
+                                author: comment.userEmail,
+                                projectName: project.name
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
 
-            if (allProjects.length === 0) {
-                projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2><p class="text-gray-400 mt-2">Asegúrate de que el archivo 'data.js' exista y contenga los datos exportados desde la aplicación principal.</p>`;
+                if (allProjects.length > 0) {
+                    renderProjectList();
+                } else {
+                    projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2>`;
+                }
             } else {
-                renderProjectList();
+                 projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">No se encontraron datos de proyectos.</h2><p class="text-gray-400 mt-2">Asegúrate de que el archivo 'data.js' exista y contenga los datos exportados desde la aplicación principal.</p>`;
             }
 
             loadingScreen.classList.add('hidden');

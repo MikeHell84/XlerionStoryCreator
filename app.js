@@ -1829,6 +1829,7 @@ async function publicarProyectoWeb() {
         finalHtml = finalHtml.replace('<link href="./libs/vis-network.min.css" rel="stylesheet" type="text/css" />', `<style>${visNetworkCssContent}</style>`);
         finalHtml = finalHtml.replace('<script src="data.js" defer></script>', `<script>${dataJsContent}</script>`);
         finalHtml = finalHtml.replace('<script src="historia.js" defer></script>', `<script>${historiaJsContent}</script>`);
+        finalHtml = finalHtml.replace('<script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>', ''); // Eliminar la librería de DB
 
         // 7. Crear un Blob y una URL para el HTML generado
         const blob = new Blob([finalHtml], { type: 'text/html' });
