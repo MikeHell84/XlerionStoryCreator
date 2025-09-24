@@ -1831,13 +1831,21 @@ async function publicarProyectoWeb() {
         finalHtml = finalHtml.replace('<script src="historia.js" defer></script>', `<script>${historiaJsContent}</script>`);
         finalHtml = finalHtml.replace('<script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>', ''); // Eliminar la librería de DB
 
-        // 7. Crear un Blob y una URL para el HTML generado
+        // 7. Crear un Blob y descargar el archivo HTML en lugar de abrirlo en una nueva pestaña.
+        // Esto es más robusto y evita problemas de seguridad del navegador con URLs de tipo 'blob:'.
         const blob = new Blob([finalHtml], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        // Usar un nombre de archivo descriptivo
+        a.download = `${project.name.replace(/\s/g, '_')}_public.html`;
+        document.body.appendChild(a);
+        a.click();
 
-        // 8. Abrir la URL en una nueva pestaña
-        window.open(url, '_blank');
-        // No es necesario revocar la URL inmediatamente, el navegador la gestionará.
+        // 8. Limpieza
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert(`¡Publicación generada! Se ha descargado el archivo "${a.download}".`);
 
     } catch (error) {
         console.error("Error al publicar el proyecto:", error);
