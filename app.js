@@ -3384,6 +3384,32 @@ function renderRatingsManagement() {
     });
 }
 
+/**
+ * Recarga los datos del proyecto actual desde el servidor y actualiza la UI.
+ * Útil para sincronizar cambios hechos en otras pestañas.
+ */
+async function refreshCurrentProjectData() {
+    if (appState.currentProjectIndex === null) return;
+
+    try {
+        const response = await fetch('data.json', { cache: 'no-store' });
+        if (response.ok) {
+            const allProjectsFromServer = await response.json();
+            const currentProjectId = appState.projects[appState.currentProjectIndex].id;
+            const updatedProject = allProjectsFromServer.find(p => p.id === currentProjectId);
+
+            if (updatedProject) {
+                // Reemplaza el proyecto en el estado local con la versión actualizada
+                appState.projects[appState.currentProjectIndex] = updatedProject;
+                // Vuelve a renderizar los detalles del proyecto y la pestaña actual
+                renderProjectDetails();
+                openTab(appState.currentTab); // Esto re-renderizará la pestaña activa (ej. Calificaciones)
+            }
+        }
+    } catch (error) {
+        console.error("Error al refrescar los datos del proyecto:", error);
+    }
+}
 // --- Asignación de Eventos ---
 
 // 1. Asignar evento a todos los botones de pestaña
@@ -3503,5 +3529,13 @@ window.addEventListener('resize', () => {
             // Volver a comprobar por si el usuario cambió de pestaña rápidamente
             if (appState.mindMapNetwork) appState.mindMapNetwork.fit();
         }, 200);
+    }
+});
+
+// --- Listener para sincronización entre pestañas ---
+window.addEventListener('storage', (event) => {
+    // Si otra pestaña (historia.html) actualiza las calificaciones, recargamos los datos.
+    if (event.key === 'xlerion-story-creator-update' && event.newValue) {
+        refreshCurrentProjectData();
     }
 });

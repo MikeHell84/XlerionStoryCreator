@@ -171,6 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Añadir la nueva calificación.
                     item.ratings.push({ userEmail: currentUser, rating });
                 }
+                // Notificar a otras pestañas (como el editor principal) que los datos han cambiado.
+                // Se usa un valor aleatorio para asegurar que el evento 'storage' se dispare siempre.
+                localStorage.setItem('xlerion-story-creator-update', Date.now().toString());
                 return true;
             } else {
                 alert(result.message); // Mostrar mensaje si el usuario ya votó
