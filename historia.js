@@ -40,27 +40,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseStaticContent = document.getElementById('btnCloseStaticContent');
     let db; // Instancia de la base de datos
     // FIX: Se define dbPromise fuera para que sea accesible globalmente en este script.
-    let dbPromise;
 
-    async function initDB(useDB) {
+    async function initDB() {
         // Reutilizamos la configuración de la base de datos de app.js
         // para asegurar la consistencia.
         db = await idb.openDB('story-creator-db', 4, {
             upgrade(db, oldVersion, newVersion, transaction) {
-                if (!db.objectStoreNames.contains('projects')) {
-                    db.createObjectStore('projects');
-                }
                 // Lógica de actualización mejorada para 'ratings'
                 const ratingsStore = db.objectStoreNames.contains('ratings')
                     ? transaction.objectStore('ratings')
                     : db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
 
-                if (!ratingsStore.indexNames.contains('user_item')) {
-                    ratingsStore.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
-                }
-                if (!ratingsStore.indexNames.contains('by_item')) {
-                    ratingsStore.createIndex('by_item', 'itemId');
-                }
+                if (!ratingsStore.indexNames.contains('user_item')) ratingsStore.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
+                if (!ratingsStore.indexNames.contains('by_item')) ratingsStore.createIndex('by_item', 'itemId');
 
                 // Lógica de actualización mejorada para 'comments'
                 const commentsStore = db.objectStoreNames.contains('comments')
@@ -69,15 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!commentsStore.indexNames.contains('by_project')) commentsStore.createIndex('by_project', 'projectId');
                 if (!commentsStore.indexNames.contains('by_user')) commentsStore.createIndex('by_user', 'userEmail');
-                // FIX: Asegurar que el índice 'user_item' exista, igual que en app.js
-                if (!commentsStore.indexNames.contains('user_item')) {
-                    commentsStore.createIndex('user_item', ['userEmail', 'itemId'], { unique: false });
-                }
             },
         });
-        // FIX: Asignar la promesa de la base de datos a la variable global.
-        if (useDB) dbPromise = db;
-        return db;
     }
 
     // --- NUEVO: Lógica de Gestión de Usuario ---
@@ -159,36 +144,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Guarda una calificación, asegurando que el usuario no haya calificado antes.
     async function saveRating(itemId, rating) {
         if (!currentUser) return false;
-
+        
         try {
             const response = await fetch('update.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'add_rating',
-                    projectId: currentProject.id,
-                    itemId: itemId,
+                    itemId,
                     userEmail: currentUser,
-                    rating: rating
+                    rating
                 })
             });
-
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Error del servidor al guardar la calificación.');
             }
-
             const result = await response.json();
             if (result.success) {
-                // Opcional: Actualizar localmente para reflejo inmediato sin recargar.
-                // Buscamos el ítem en el proyecto actual y añadimos la calificación.
-                for (const category of ['chapters', 'characters', 'places', 'objects']) {
-                    const item = currentProject[category]?.find(i => (i.id || `${currentProject.id}-${category}-${currentProject[category].indexOf(i)}`) === itemId);
-                    if (item) {
-                        if (!item.ratings) item.ratings = [];
-                        item.ratings.push({ userEmail: currentUser, rating });
-                        break;
-                    }
+                // Actualizar la calificación en el objeto local para reflejo inmediato.
+                const item = findItemById(itemId);
+                if (item) {
+                    if (!item.ratings) item.ratings = [];
+                    // Eliminar calificación anterior del usuario si existe, para evitar duplicados.
+                    item.ratings = item.ratings.filter(r => r.userEmail !== currentUser);
+                    // Añadir la nueva calificación.
+                    item.ratings.push({ userEmail: currentUser, rating });
                 }
                 return true;
             } else {
@@ -204,38 +185,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Guarda un comentario, asegurando que el usuario no haya comentado antes.
     async function saveComment(itemId, message) { 
-        if (!currentUser || !message.trim() || !db) return false; // Validaciones básicas
+        if (!currentUser || !message.trim()) return false; // Validaciones básicas
         try {
-            await db.add('comments', { projectId: currentProject.id, itemId, userEmail: currentUser, message, timestamp: Date.now() });
             const response = await fetch('update.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'add_comment',
-                    projectId: currentProject.id,
-                    itemId: itemId,
+                    itemId,
                     userEmail: currentUser,
-                    message: message,
+                    message,
                     timestamp: Date.now()
                 })
             });
-
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Error del servidor al guardar el comentario.');
             }
-
             const result = await response.json();
             if (result.success) {
                 if (!currentProject.comments) currentProject.comments = [];
                 currentProject.comments.push({ itemId, userEmail: currentUser, message, timestamp: Date.now() });
                 return true;
             }
+            alert(result.message);
             return false;
         } catch (error) {
             console.error("Error al guardar el comentario:", error);
             return false;
         }
+    }
+
+    function findItemById(itemId) {
+        for (const category of ['chapters', 'characters', 'places', 'objects']) {
+            const item = currentProject[category]?.find(i => (i.id || `${currentProject.id}-${category}-${currentProject[category].indexOf(i)}`) === itemId);
+            if (item) {
+                return item;
+            }
+        }
+        return null;
     }
 
     // --- Lógica de Renderizado ---
@@ -501,24 +489,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function renderRatingsAndComments(itemId) {
         // FIX: Si los contenedores no existen en el HTML, no continuar.
-        if (!detailsRatingContainer || !detailsCommentsContainer || !db) return;
-
-        // FIX: Si no hay base de datos (ej. en data.json), no hacer nada.
-        if (!db) {
-            detailsRatingContainer.innerHTML = '<p class="text-gray-500 text-sm">Las calificaciones no están disponibles en este modo.</p>';
-            detailsCommentsContainer.innerHTML = '<p class="text-gray-500 text-sm">Los comentarios no están disponibles en este modo.</p>';
-            return;
-        }
-        // --- Calificaciones ---
+        if (!detailsRatingContainer || !detailsCommentsContainer) return;
+    
+        // Obtener el item actual para acceder a sus calificaciones y comentarios locales.
+        const item = findItemById(itemId);
+        if (!item) return;
+    
+        // --- Calificaciones --- (Ahora lee de la data local que viene de data.json)
         let userRating = 0;
         if (currentUser) {
-            const userRatingTx = await db.getFromIndex('ratings', 'user_item', [currentUser, itemId]);
-            if (userRatingTx) {
-                userRating = userRatingTx.rating;
+            const userRatingObj = item.ratings?.find(r => r.userEmail === currentUser);
+            if (userRatingObj) {
+                userRating = userRatingObj.rating;
             }
         }
 
-        const itemRatings = await db.getAllFromIndex('ratings', 'by_item', itemId);
+        const itemRatings = item.ratings || [];
         const averageRating = itemRatings.length > 0 ? (itemRatings.reduce((sum, r) => sum + r.rating, 0) / itemRatings.length) : 0;
         
         const ratingStarsContainer = document.getElementById('average-stars');
@@ -577,10 +563,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // --- Comentarios ---
-        const allCommentsForProject = await db.getAllFromIndex('comments', 'by_project', currentProject.id);
-        const filteredComments = allCommentsForProject.filter(c => c.itemId === itemId).sort((a, b) => b.timestamp - a.timestamp);
-        // NUEVO: Comprobar si el usuario actual ya ha comentado.
-        const userHasCommented = currentUser ? filteredComments.some(c => c.userEmail === currentUser) : false;
+        const allCommentsForProject = currentProject.comments || [];
+        const filteredComments = allCommentsForProject.filter(c => c.itemId === itemId).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const userHasCommented = currentUser ? filteredComments.some(c => c.userEmail === currentUser && c.itemId === itemId) : false;
         
         commentsList.innerHTML = '';
         if (filteredComments.length > 0) {
@@ -857,64 +842,40 @@ document.addEventListener('DOMContentLoaded', () => {
         // Se hace al principio para que el usuario vea algo mientras se procesan los datos.
         loadingScreen.classList.add('hidden');
         try {
-            // --- LÓGICA DE CARGA DE DATOS REESTRUCTURADA ---
+            // --- LÓGICA DE CARGA DE DATOS SIMPLIFICADA ---
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('projectId');
  
-            // Prioridad 1: Cargar desde data.json (modo público principal)
+            // Siempre cargamos desde data.json, que debe contener todos los proyectos,
+            // calificaciones y comentarios.
             try {
-                const response = await fetch('data.json');
+                const response = await fetch('data.json', { cache: 'no-store' });
                 if (response.ok) {
                     allProjects = await response.json();
-                    // Si se carga desde data.json, no necesitamos la lógica de projectId.
-                    // La página mostrará la lista de proyectos para que el visitante elija.
                 } else {
-                    // Si data.json no existe o falla, continuamos con los otros métodos.
-                    console.warn('data.json no encontrado o no accesible. Intentando otros métodos de carga.');
+                    throw new Error('No se pudo cargar data.json');
                 }
             } catch (e) {
-                console.warn('Error al buscar data.json:', e);
+                console.error('Error al cargar data.json:', e);
+                projectSelectionScreen.innerHTML = `<h2 class="text-2xl text-yellow-400">Error de Carga</h2><p class="text-gray-400 mt-2">No se pudo encontrar el archivo de datos principal (data.json).</p>`;
+                projectSelectionScreen.classList.remove('hidden');
+                return;
             }
 
-
-            // Prioridad 2: Cargar desde IndexedDB si se pasa un projectId en la URL.
-            // Este es el modo "dinámico" que solicitaste.
+            // Si se especifica un projectId en la URL, mostramos ese proyecto directamente.
             if (projectId) {
-                db = await initDB(true); // FIX: Indicar que se usará la BD y asignar la instancia.
-                // FIX: Se obtienen los proyectos y comentarios de la base de datos.
-                // Los proyectos se guardan como un array bajo la clave 'allProjects'.
-                const storedProjects = await db.get('projects', 'allProjects');
-                const storedComments = await db.getAll('comments');
- 
-                if (storedProjects && storedProjects.length > 0) {
-                    const projectToShow = storedProjects.find(p => p.id === projectId);
-                    if (projectToShow) {
-                        allProjects = storedProjects;
-                        currentProject = projectToShow;
-                        // Mapear comentarios para el slider, añadiendo el nombre del proyecto.
-                        allComments = storedComments.map(c => ({
-                            ...c,
-                            author: c.userEmail, // Adaptar el nombre del campo
-                            projectName: allProjects.find(p => p.id === c.projectId)?.name || 'Desconocido'
-                        }));
-                        renderProject(currentProject);
-                        return; // Salir para no mostrar la lista de proyectos.
-                    } 
+                const projectToShow = allProjects.find(p => p.id === projectId);
+                if (projectToShow) {
+                    currentProject = projectToShow;
+                    renderProject(currentProject);
+                    return; // Salir para no mostrar la lista de proyectos.
+                } else {
+                    console.warn(`Proyecto con ID "${projectId}" no encontrado. Mostrando lista de proyectos.`);
                 }
-            } else if (window.allProjectsData) { // Prioridad 3: Modo publicado (archivo HTML autónomo con datos incrustados)
-                allProjects = window.allProjectsData;
             }
 
-            // FIX: Si estamos usando la base de datos, cargar los comentarios para el slider.
-            if (db) {
-                const storedComments = await db.getAll('comments');
-                if (storedComments && storedComments.length > 0) {
-                     allComments = storedComments.map(c => ({
-                        ...c,
-                        author: c.userEmail,
-                        projectName: allProjects.find(p => p.id === c.projectId)?.name || 'Desconocido'
-                    }));
-                }
+            if (window.allProjectsData) { // Modo publicado (archivo HTML autónomo con datos incrustados)
+                allProjects = window.allProjectsData;
             }
 
             if (allProjects && allProjects.length > 0) {
