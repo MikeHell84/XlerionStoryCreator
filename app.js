@@ -3313,34 +3313,36 @@ function renderRatingsManagement() {
     const container = dom.ratingsManagementList;
     const noRatingsMessage = dom.noRatingsMessage;
 
-    if (!container || !project) return;
+    if (!container || !project || !noRatingsMessage) return;
 
     // Limpiar la lista anterior
     container.innerHTML = '';
-    if (noRatingsMessage) container.appendChild(noRatingsMessage);
+    container.appendChild(noRatingsMessage); // Re-add the message element
 
     const allRatings = [];
     const categories = ['chapters', 'characters', 'places', 'objects'];
 
     // 1. Recolectar todas las calificaciones del proyecto
     categories.forEach(category => {
-        if (project[category]) {
-            project[category].forEach((item, index) => {
-                if (item.ratings && item.ratings.length > 0) {
-                    const itemId = item.id || `${project.id}-${category}-${index}`;
-                    item.ratings.forEach(rating => {
+        const items = project[category] || [];
+        items.forEach((item, index) => {
+            if (item.ratings && item.ratings.length > 0) {
+                const itemId = item.id || `${project.id}-${category}-${index}`;
+                item.ratings.forEach(rating => {
+                    // Solo añadir si la calificación es válida (tiene un usuario y una puntuación)
+                    if (rating.userEmail && rating.rating) {
                         allRatings.push({
                             ...rating,
                             itemId: itemId,
                             itemName: item.name,
                             itemType: category.charAt(0).toUpperCase() + category.slice(1, -1),
                             // Usar el timestamp del comentario si existe, o un valor por defecto
-                            timestamp: project.comments?.find(c => c.itemId === itemId && c.userEmail === rating.userEmail)?.timestamp || null
+                            timestamp: project.comments?.find(c => c.itemId === itemId && c.userEmail === rating.userEmail)?.timestamp || 0
                         });
-                    });
-                }
-            });
-        }
+                    }
+                });
+            }
+        });
     });
 
     if (allRatings.length === 0) {
