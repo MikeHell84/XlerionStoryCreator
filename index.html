@@ -310,6 +310,7 @@
               <button data-tab="objects" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-box mr-1"></i>Objetos</button>
               <button data-tab="mindmap" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-project-diagram mr-1"></i>Mapa Mental</button>
               <button data-tab="comments" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-comments mr-1"></i>Comentarios</button>
+              <button data-tab="ratings" class="tab-button w-full text-left md:text-center py-2 px-4 rounded-full text-sm font-medium hover:bg-[#333]"><i class="fas fa-star-half-alt mr-1"></i>Calificaciones</button>
             </nav>
         </div>
       </header>
@@ -473,6 +474,18 @@
         <div id="commentsManagementList" class="space-y-4">
           <div id="no-comments-message" class="text-center py-12 text-gray-500 hidden">
             <i class="fas fa-comment-slash text-4xl mb-4"></i><p>Aún no hay comentarios para este proyecto.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gestión de Calificaciones -->
+      <div id="tab-ratings" class="tab-content overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold">Gestión de Calificaciones</h3>
+        </div>
+        <div id="ratingsManagementList" class="space-y-4">
+          <div id="no-ratings-message" class="text-center py-12 text-gray-500 hidden">
+            <i class="fas fa-star-slash text-4xl mb-4"></i><p>Aún no hay calificaciones para este proyecto.</p>
           </div>
         </div>
       </div>

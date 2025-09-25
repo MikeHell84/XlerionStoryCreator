@@ -164,6 +164,8 @@ const dom = {
   // Comments Management
   commentsManagementList: document.getElementById('commentsManagementList'),
   featuredCharactersContainer: document.getElementById('featuredCharactersContainer'),
+  ratingsManagementList: document.getElementById('ratingsManagementList'), // Añadido
+  noRatingsMessage: document.getElementById('no-ratings-message'), // Añadido
   noCommentsMessage: document.getElementById('no-comments-message'), // Añadido
   featuredPlacesContainer: document.getElementById('featuredPlacesContainer'),
   featuredObjectsContainer: document.getElementById('featuredObjectsContainer'),
@@ -3177,6 +3179,11 @@ function openTab(tabName) {
         renderCommentsManagement();
     }
 
+    // 7. Lógica para la gestión de calificaciones
+    if (tabName === 'ratings') {
+        renderRatingsManagement();
+    }
+
     // 5. Actualizar UI del dropdown móvil
     if (dom.tabsToggle && dom.currentTabName && dom.tabsNav) {
         const activeButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
@@ -3260,6 +3267,75 @@ function renderCommentsManagement() {
             </div>
         `;
         container.appendChild(commentCard);
+    });
+}
+
+/**
+ * Renderiza la lista de calificaciones en la pestaña "Gestión de Calificaciones".
+ */
+function renderRatingsManagement() {
+    const project = appState.projects[appState.currentProjectIndex];
+    const container = dom.ratingsManagementList;
+    const noRatingsMessage = dom.noRatingsMessage;
+
+    if (!container || !project) return;
+
+    // Limpiar la lista anterior
+    container.innerHTML = '';
+    if (noRatingsMessage) container.appendChild(noRatingsMessage);
+
+    const allRatings = [];
+    const categories = ['chapters', 'characters', 'places', 'objects'];
+
+    // 1. Recolectar todas las calificaciones del proyecto
+    categories.forEach(category => {
+        if (project[category]) {
+            project[category].forEach((item, index) => {
+                if (item.ratings && item.ratings.length > 0) {
+                    const itemId = item.id || `${project.id}-${category}-${index}`;
+                    item.ratings.forEach(rating => {
+                        allRatings.push({
+                            ...rating,
+                            itemId: itemId,
+                            itemName: item.name,
+                            itemType: category.charAt(0).toUpperCase() + category.slice(1, -1),
+                            // Usar el timestamp del comentario si existe, o un valor por defecto
+                            timestamp: project.comments?.find(c => c.itemId === itemId && c.userEmail === rating.userEmail)?.timestamp || null
+                        });
+                    });
+                }
+            });
+        }
+    });
+
+    if (allRatings.length === 0) {
+        if (noRatingsMessage) noRatingsMessage.classList.remove('hidden');
+        return;
+    }
+
+    if (noRatingsMessage) noRatingsMessage.classList.add('hidden');
+
+    // Ordenar por fecha si está disponible, si no, se mantienen como están.
+    allRatings.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // 2. Renderizar cada calificación
+    allRatings.forEach(rating => {
+        const ratingCard = document.createElement('div');
+        ratingCard.className = 'comment-card p-4 rounded-lg shadow-md'; // Reutilizamos el estilo de tarjeta
+
+        let starsHtml = '';
+        for (let i = 1; i <= 5; i++) {
+            starsHtml += `<i class="fas fa-star ${i <= rating.rating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
+        }
+
+        ratingCard.innerHTML = `
+            <div class="flex justify-between items-center">
+                <p class="text-lg">Calificación de <span class="font-semibold text-indigo-400">${rating.userEmail}</span></p>
+                <div class="text-xl">${starsHtml}</div>
+            </div>
+            <p class="text-sm text-gray-400 mt-1">Para el ítem: <span class="font-semibold">${rating.itemName} (${rating.itemType})</span></p>
+        `;
+        container.appendChild(ratingCard);
     });
 }
 
