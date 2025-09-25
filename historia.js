@@ -526,16 +526,25 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 1; i <= 5; i++) {
                 const star = document.createElement('i');
                 star.className = `fas fa-star cursor-pointer ${i <= userRating ? 'text-yellow-400' : 'text-gray-500 hover:text-yellow-300'}`;
-                star.dataset.value = i;
-                // Si el usuario ya calificó (userRating > 0), no se añade el evento onclick.
+                star.dataset.value = i; // Asignar el valor de la estrella
+
+                // Función para manejar el clic o toque
+                const handleRatingClick = async (event) => {
+                    // Prevenir que se disparen ambos eventos (click y touchend)
+                    event.preventDefault(); 
+                    event.stopPropagation();
+
+                    const newRating = parseInt(star.dataset.value, 10);
+                    const success = await saveRating(itemId, newRating);
+                    if (success) {
+                        await renderRatingsAndComments(itemId); // Re-renderizar para actualizar
+                    }
+                };
+
+                // Añadir listeners para click y touch, solo si el usuario no ha calificado aún.
                 if (userRating === 0) {
-                    star.onclick = async () => {
-                        const newRating = parseInt(star.dataset.value, 10);
-                        const success = await saveRating(itemId, newRating);
-                        if (success) {
-                            await renderRatingsAndComments(itemId); // Re-renderizar para actualizar
-                        }
-                    };
+                    star.addEventListener('click', handleRatingClick);
+                    star.addEventListener('touchend', handleRatingClick);
                 }
                 userStarsContainer.appendChild(star);
             }
@@ -567,13 +576,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const filteredComments = allCommentsForProject.filter(c => c.itemId === itemId).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         const userHasCommented = currentUser ? filteredComments.some(c => c.userEmail === currentUser && c.itemId === itemId) : false;
         
-        commentsList.innerHTML = '';
+        commentsList.innerHTML = ''; // Limpiar la lista de comentarios
         if (filteredComments.length > 0) {
             filteredComments.forEach(comment => {
+                // Buscar si este usuario también calificó el ítem
+                const userRatingForThisCommenter = item.ratings?.find(r => r.userEmail === comment.userEmail);
+                let ratingDisplayHtml = '';
+
+                if (userRatingForThisCommenter) {
+                    let starsHtml = '';
+                    for (let i = 1; i <= 5; i++) {
+                        starsHtml += `<i class="fas fa-star text-xs ${i <= userRatingForThisCommenter.rating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
+                    }
+                    // Contenedor para las estrellas con un pequeño margen
+                    ratingDisplayHtml = `<div class="flex-shrink-0 ml-4">${starsHtml}</div>`;
+                }
+
                 const li = document.createElement('li');
                 li.className = 'bg-gray-800 p-3 rounded-lg';
                 li.innerHTML = `
-                    <p class="text-gray-300">${comment.message}</p>
+                    <div class="flex justify-between items-center">
+                        <p class="text-gray-300 flex-grow">${comment.message}</p>
+                        ${ratingDisplayHtml}
+                    </div>
                     <p class="text-xs text-gray-500 mt-1 text-right">- ${comment.userEmail} (${new Date(comment.timestamp).toLocaleString()})</p>
                 `;
                 commentsList.appendChild(li);
