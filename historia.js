@@ -1,6 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
-    let allProjects = []; // Caché para todos los proyectos
+    let allProjects = [];
     let currentProject = null; // Proyecto actualmente seleccionado
+    let currentUser = null; // Correo del usuario actual
+
+    // --- NUEVO: Selectores para la gestión de usuario, calificaciones y comentarios ---
+    const userSessionContainer = document.getElementById('user-session');
+    const userEmailSpan = document.getElementById('user-email-span');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const loginModal = document.getElementById('loginModal');
+    const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('emailInput');
+    const btnCloseLoginModal = document.getElementById('closeLoginModal');
+    const loginError = document.getElementById('loginError');
+
     let publicMindMapNetwork = null; // Instancia del mapa mental para la vista pública
     let allComments = []; // Caché para todos los comentarios de los proyectos
     let commentSliderInterval; // Intervalo para el slider de comentarios
@@ -10,40 +23,156 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectSelectionScreen = document.getElementById('projectSelectionScreen');
     const publicProjectList = document.getElementById('publicProjectList');
     const backToProjectsBtn = document.getElementById('backToProjectsBtn');
-    const detailsModal = document.getElementById('detailsModal');
-    const detailsTitle = document.getElementById('detailsTitle');
-    const detailsBody = document.getElementById('detailsBody');
-    const btnCloseDetails = document.getElementById('btnCloseDetails');
+    const detailsModal = document.getElementById('publicDetailsModal');
+    const detailsModalContent = document.getElementById('publicDetailsModalContent');
+    const detailsTitle = document.getElementById('publicDetailsTitle');
+    const detailsBody = document.getElementById('publicDetailsBody');
+
+    const detailsRatingContainer = document.getElementById('detailsRatingContainer');
+    const detailsCommentsContainer = document.getElementById('detailsCommentsContainer');
+    const commentsList = document.getElementById('commentsList');
+    const commentForm = document.getElementById('commentForm');
     
     // Selectores para el modal de contenido estático (Acerca de, Contacto, etc.)
     const staticContentModal = document.getElementById('staticContentModal');
     const staticContentTitle = document.getElementById('staticContentTitle');
     const staticContentBody = document.getElementById('staticContentBody');
     const btnCloseStaticContent = document.getElementById('btnCloseStaticContent');
-    
-    // --- Gestión de datos (IndexedDB) ---
-    // La base de datos se usa para "Ver Vista Pública", mientras que
-    // `window.allProjectsData` se usa para los archivos publicados.
-    let db;
-    async function initDB() {
+    let db; // Instancia de la base de datos
+    // FIX: Se define dbPromise fuera para que sea accesible globalmente en este script.
+    let dbPromise;
+
+    async function initDB(useDB) {
         // Reutilizamos la configuración de la base de datos de app.js
         // para asegurar la consistencia.
-        db = await idb.openDB('story-creator-db', 2, {
-            upgrade(db) {
+        db = await idb.openDB('story-creator-db', 4, {
+            upgrade(db, oldVersion, newVersion, transaction) {
                 if (!db.objectStoreNames.contains('projects')) {
                     db.createObjectStore('projects');
                 }
-                if (!db.objectStoreNames.contains('ratings')) {
-                    const store = db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
-                    store.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
+                // Lógica de actualización mejorada para 'ratings'
+                const ratingsStore = db.objectStoreNames.contains('ratings')
+                    ? transaction.objectStore('ratings')
+                    : db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
+
+                if (!ratingsStore.indexNames.contains('user_item')) {
+                    ratingsStore.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
                 }
-                if (!db.objectStoreNames.contains('comments')) {
-                    const store = db.createObjectStore('comments', { keyPath: 'id', autoIncrement: true });
-                    store.createIndex('by_project', 'projectId');
-                    store.createIndex('by_user', 'userEmail');
+                if (!ratingsStore.indexNames.contains('by_item')) {
+                    ratingsStore.createIndex('by_item', 'itemId');
+                }
+
+                // Lógica de actualización mejorada para 'comments'
+                const commentsStore = db.objectStoreNames.contains('comments')
+                    ? transaction.objectStore('comments')
+                    : db.createObjectStore('comments', { keyPath: 'id', autoIncrement: true });
+
+                if (!commentsStore.indexNames.contains('by_project')) commentsStore.createIndex('by_project', 'projectId');
+                if (!commentsStore.indexNames.contains('by_user')) commentsStore.createIndex('by_user', 'userEmail');
+                // FIX: Asegurar que el índice 'user_item' exista, igual que en app.js
+                if (!commentsStore.indexNames.contains('user_item')) {
+                    commentsStore.createIndex('user_item', ['userEmail', 'itemId'], { unique: false });
                 }
             },
         });
+        // FIX: Asignar la promesa de la base de datos a la variable global.
+        if (useDB) dbPromise = db;
+        return db;
+    }
+
+    // --- NUEVO: Lógica de Gestión de Usuario ---
+
+    function checkUserSession() {
+        const storedEmail = localStorage.getItem('storyCreatorUser');
+        // FIX: Si el contenedor de sesión no existe, no hacemos nada.
+        if (!userSessionContainer) return;
+
+        if (storedEmail) {
+            currentUser = storedEmail;
+            userEmailSpan.textContent = currentUser;
+            userSessionContainer.classList.remove('logged-out');
+            userSessionContainer.classList.add('logged-in');
+        } else {
+            currentUser = null;
+            userSessionContainer.classList.remove('logged-in');
+            userSessionContainer.classList.add('logged-out');
+        }
+    }
+
+    function handleLogin(e) {
+        e.preventDefault();
+        if (!emailInput || !loginError || !loginModal) return; // Comprobar que los elementos del formulario existen.
+
+        const email = emailInput.value.trim();
+        const validDomains = [
+            '@gmail.com', '@outlook.com', '@hotmail.com', '@yahoo.com', 
+            '@yahoo.es', '@yahoo.com.ar', '@yahoo.com.mx', '@protonmail.com', '@icloud.com'
+        ];
+
+        if (email && validDomains.some(domain => email.endsWith(domain))) {
+            localStorage.setItem('storyCreatorUser', email);
+            loginError.classList.add('hidden');
+            loginModal.classList.add('hidden');
+            emailInput.value = '';
+            checkUserSession();
+            // Re-renderizar el modal de detalles si está abierto para mostrar los formularios
+            if (!detailsModal.classList.contains('hidden')) {
+                const type = detailsModal.dataset.type;
+                const index = detailsModal.dataset.index;
+                showDetails(type, parseInt(index, 10));
+            }
+        } else {
+            loginError.textContent = 'Por favor, usa un correo de un proveedor conocido (Gmail, Outlook, Yahoo, etc.).';
+            loginError.classList.remove('hidden');
+        }
+    }
+
+    function handleLogout() {
+        if (!detailsModal) return; // Comprobar que los elementos existen.
+
+        localStorage.removeItem('storyCreatorUser');
+        currentUser = null;
+        checkUserSession();
+        // Re-renderizar el modal de detalles si está abierto para ocultar los formularios
+        if (!detailsModal.classList.contains('hidden')) {
+            const type = detailsModal.dataset.type;
+            const index = detailsModal.dataset.index;
+            showDetails(type, parseInt(index, 10));
+        }
+    }
+
+    // Función para cerrar el modal de detalles
+    function closeDetailsModal() {
+        if (detailsModal) {
+            detailsModal.classList.add('hidden');
+        }
+    }
+
+
+    // --- NUEVO: Funciones para Calificaciones y Comentarios ---
+    // Guarda una calificación, asegurando que el usuario no haya calificado antes.
+    async function saveRating(itemId, rating) { 
+        if (!currentUser || !db) return false;
+        const tx = db.transaction('ratings', 'readwrite');
+        const store = tx.objectStore('ratings');
+        const existing = await store.index('user_item').get([currentUser, itemId]);
+        if (existing) return false; // El usuario ya ha calificado, no se permite cambiar.
+        
+        await store.add({ userEmail: currentUser, itemId, rating });
+        await tx.done;
+        return true;
+    }
+
+    // Guarda un comentario, asegurando que el usuario no haya comentado antes.
+    async function saveComment(itemId, message) { 
+        if (!currentUser || !message.trim() || !db) return false; // Validaciones básicas
+        try {
+            await db.add('comments', { projectId: currentProject.id, itemId, userEmail: currentUser, message, timestamp: Date.now() });
+            return true;
+        } catch (error) {
+            console.error("Error al guardar el comentario:", error);
+            return false;
+        }
     }
 
     // --- Lógica de Renderizado ---
@@ -212,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showProjectSelection() {
         storyContent.classList.add('hidden');
         projectSelectionScreen.classList.remove('hidden');
-        document.title = "Xlerion's Stories - Proyectos"; // Resetear título
+        document.title = "Xlerion Stories - Proyectos"; // Resetear título
 
         // Mostrar slider si tiene contenido
         const imageSliderContainer = document.getElementById('image-slider-container');
@@ -227,14 +356,14 @@ document.addEventListener('DOMContentLoaded', () => {
         startCommentSlider();
     }
 
-    function showDetails(type, index) {
+    async function showDetails(type, index) {
         if (!currentProject) return;
         
         // CORRECCIÓN: El 'type' viene como 'characters', 'places', etc. (plural).
         // El objeto del proyecto usa estas mismas claves en plural.
         const item = currentProject[type]?.[index];
 
-        if (!item) return;
+        if (!item) { console.error(`Item no encontrado para ${type}[${index}]`); return; }
         
         detailsTitle.textContent = item.name || 'Detalle';
         
@@ -293,15 +422,124 @@ document.addEventListener('DOMContentLoaded', () => {
 
         detailsBody.innerHTML = bodyHtml;
         detailsModal.classList.remove('hidden');
+        detailsModal.dataset.type = type;
+        detailsModal.dataset.index = index; // Guardar el índice
+        // FIX: Generar un ID único y consistente para el ítem.
+        const itemId = item.id || `${currentProject.id}-${type}-${index}`;
+        detailsModal.dataset.itemId = itemId;
 
-        // --- CORRECCIÓN: Asignar evento de cierre aquí ---
-        // Se asigna el evento cada vez que se abre el modal para asegurar que funcione.
-        const btnClose = document.getElementById('btnCloseDetails');
-        if (btnClose) {
-            // Usamos .onclick para reemplazar cualquier listener anterior y evitar duplicados.
-            btnClose.onclick = () => {
-                detailsModal.classList.add('hidden');
-            };
+        // --- NUEVO: Renderizar Calificaciones y Comentarios ---
+        await renderRatingsAndComments(itemId);
+    }
+
+    async function renderRatingsAndComments(itemId) {
+        // FIX: Si los contenedores no existen en el HTML, no continuar.
+        if (!detailsRatingContainer || !detailsCommentsContainer || !db) return;
+
+        // FIX: Si no hay base de datos (ej. en data.json), no hacer nada.
+        if (!db) {
+            detailsRatingContainer.innerHTML = '<p class="text-gray-500 text-sm">Las calificaciones no están disponibles en este modo.</p>';
+            detailsCommentsContainer.innerHTML = '<p class="text-gray-500 text-sm">Los comentarios no están disponibles en este modo.</p>';
+            return;
+        }
+        // --- Calificaciones ---
+        let userRating = 0;
+        if (currentUser) {
+            const userRatingTx = await db.getFromIndex('ratings', 'user_item', [currentUser, itemId]);
+            if (userRatingTx) {
+                userRating = userRatingTx.rating;
+            }
+        }
+
+        const itemRatings = await db.getAllFromIndex('ratings', 'by_item', itemId);
+        const averageRating = itemRatings.length > 0 ? (itemRatings.reduce((sum, r) => sum + r.rating, 0) / itemRatings.length) : 0;
+        
+        const ratingStarsContainer = document.getElementById('average-stars');
+        if (ratingStarsContainer) {
+            ratingStarsContainer.innerHTML = '';
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('i');
+                star.className = `fas fa-star ${i <= Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-600'}`;
+                ratingStarsContainer.appendChild(star);
+            }
+            const ratingValueEl = detailsRatingContainer.querySelector('.rating-value');
+            if (ratingValueEl) ratingValueEl.textContent = `${averageRating.toFixed(1)}/5 (${itemRatings.length} votos)`;
+        }
+
+        // Lógica para que el usuario califique
+        const userStarsContainer = document.getElementById('user-stars');
+        if (userStarsContainer) {
+            userStarsContainer.innerHTML = ''; // Limpiar estrellas anteriores
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('i');
+                star.className = `fas fa-star cursor-pointer ${i <= userRating ? 'text-yellow-400' : 'text-gray-500 hover:text-yellow-300'}`;
+                star.dataset.value = i;
+                // Si el usuario ya calificó (userRating > 0), no se añade el evento onclick.
+                if (userRating === 0) {
+                    star.onclick = async () => {
+                        const newRating = parseInt(star.dataset.value, 10);
+                        const success = await saveRating(itemId, newRating);
+                        if (success) {
+                            await renderRatingsAndComments(itemId); // Re-renderizar para actualizar
+                        }
+                    };
+                }
+                userStarsContainer.appendChild(star);
+            }
+        }
+
+        const userRatingSection = document.getElementById('user-rating-section');
+        const userRatedMessage = document.getElementById('user-rated-message');
+        if (currentUser) {
+            if (userRatingSection) userRatingSection.classList.remove('hidden');
+            // NUEVO: Si ya ha calificado, mostrar un mensaje y deshabilitar las estrellas.
+            if (userRating > 0 && userStarsContainer && userRatedMessage) {
+                userStarsContainer.classList.add('opacity-50', 'pointer-events-none');
+                userRatedMessage.textContent = '(Ya has calificado)';
+                userRatedMessage.classList.remove('hidden');
+            }
+        } else {
+            if (userRatingSection) userRatingSection.classList.add('hidden');
+        }
+
+        // --- Comentarios ---
+        const allCommentsForProject = await db.getAllFromIndex('comments', 'by_project', currentProject.id);
+        const filteredComments = allCommentsForProject.filter(c => c.itemId === itemId).sort((a, b) => b.timestamp - a.timestamp);
+        // NUEVO: Comprobar si el usuario actual ya ha comentado.
+        const userHasCommented = currentUser ? filteredComments.some(c => c.userEmail === currentUser) : false;
+        
+        commentsList.innerHTML = '';
+        if (filteredComments.length > 0) {
+            filteredComments.forEach(comment => {
+                const li = document.createElement('li');
+                li.className = 'bg-gray-800 p-3 rounded-lg';
+                li.innerHTML = `
+                    <p class="text-gray-300">${comment.message}</p>
+                    <p class="text-xs text-gray-500 mt-1 text-right">- ${comment.userEmail} (${new Date(comment.timestamp).toLocaleString()})</p>
+                `;
+                commentsList.appendChild(li);
+            });
+        } else {
+            commentsList.innerHTML = '<p class="text-gray-500">No hay comentarios aún. ¡Sé el primero!</p>';
+        }
+
+        const commentTextarea = document.getElementById('comment-textarea');
+        const commentSubmitBtn = commentForm.querySelector('button[type="submit"]');
+        // NUEVO: Lógica mejorada para mostrar/ocultar el formulario de comentario.
+        if (currentUser && !userHasCommented && commentTextarea && commentSubmitBtn) {
+            commentForm.classList.remove('hidden');
+            commentTextarea.disabled = false;
+            commentTextarea.placeholder = "Escribe tu comentario...";
+            commentSubmitBtn.disabled = false;
+            commentTextarea.value = '';
+        } else if (currentUser && userHasCommented && commentTextarea && commentSubmitBtn) {
+            commentForm.classList.remove('hidden');
+            commentTextarea.placeholder = "Ya has comentado en este ítem.";
+            commentTextarea.disabled = true;
+            commentSubmitBtn.disabled = true;
+            commentTextarea.value = '';
+        } else {
+            commentForm.classList.add('hidden');
         }
     }
 
@@ -507,17 +745,11 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes: {
                 shape: 'box',
                 margin: 10,
-                font: { 
-                    color: '#e2e8f0',
-                    highlight: '#FFFFFF' // Texto blanco al seleccionar
-                },
+                font: { color: '#e2e8f0' },
                 color: {
                     border: '#6366f1',
                     background: '#1F2937',
-                    highlight: { 
-                        border: '#a5b4fc', 
-                        background: '#4f46e5' 
-                    },
+                    highlight: { border: '#a5b4fc', background: '#4f46e5' },
                     hover: {
                         border: '#818cf8'
                     }
@@ -574,7 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prioridad 2: Cargar desde IndexedDB si se pasa un projectId en la URL.
             // Este es el modo "dinámico" que solicitaste.
             if (projectId) {
-                await initDB();
+                db = await initDB(true); // FIX: Indicar que se usará la BD y asignar la instancia.
                 // FIX: Se obtienen los proyectos y comentarios de la base de datos.
                 // Los proyectos se guardan como un array bajo la clave 'allProjects'.
                 const storedProjects = await db.get('projects', 'allProjects');
@@ -599,10 +831,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 allProjects = window.allProjectsData;
             }
 
+            // FIX: Si estamos usando la base de datos, cargar los comentarios para el slider.
+            if (db) {
+                const storedComments = await db.getAll('comments');
+                if (storedComments && storedComments.length > 0) {
+                     allComments = storedComments.map(c => ({
+                        ...c,
+                        author: c.userEmail,
+                        projectName: allProjects.find(p => p.id === c.projectId)?.name || 'Desconocido'
+                    }));
+                }
+            }
+
             if (allProjects && allProjects.length > 0) {
                 // Si solo hay un proyecto (como en el caso de la vista pública), muéstralo directamente.
                 // También aplica si solo hay un proyecto en data.json
-                if (allProjects.length === 1) {
+                if (allProjects.length === 1 && !projectId) {
                     selectAndRenderProject(allProjects[0].id);
                     return; // Salimos para no mostrar la lista de proyectos
                 }
@@ -632,28 +876,62 @@ document.addEventListener('DOMContentLoaded', () => {
             storyContent.innerHTML = `
                 <div class="text-center">
                     <h1 class="text-3xl font-bold text-red-400">Error al Cargar los Datos</h1>
-                    <p class="mt-4 text-lg">No se pudieron cargar los proyectos.</p>
+                    <p class="mt-4 text-lg">No se pudieron cargar los proyectos. Revisa la consola para más detalles.</p>
                 </div>
             `;
             loadingScreen.classList.add('hidden');
             storyContent.classList.remove('hidden');
         }
+    }
 
-        // --- Asignación de Eventos Centralizada ---
-        backToProjectsBtn.addEventListener('click', showProjectSelection);
-
-        // Eventos para el modal de contenido estático
-        if (btnCloseStaticContent) {
-            btnCloseStaticContent.addEventListener('click', () => staticContentModal.classList.add('hidden'));
+    // --- NUEVO: Método de Cierre de Modales Centralizado y Robusto ---
+    function handleModalClicks(e) {
+        // Cierra el modal de detalles si se hace clic en el botón de cierre o en el fondo
+        if (detailsModal && !detailsModal.classList.contains('hidden')) {
+            if (e.target.id === 'publicCloseDetailsModal' || e.target === detailsModal) {
+                detailsModal.classList.add('hidden');
+            }
         }
-        if (staticContentModal) {
-            staticContentModal.addEventListener('click', (e) => {
-                if (e.target === staticContentModal) {
-                    staticContentModal.classList.add('hidden');
+        // Cierra el modal de login si se hace clic en el botón de cierre o en el fondo
+        if (loginModal && !loginModal.classList.contains('hidden')) {
+            if (e.target.id === 'closeLoginModal' || e.target === loginModal) {
+                loginModal.classList.add('hidden');
+            }
+        }
+        // Cierra el modal de contenido estático
+        if (staticContentModal && !staticContentModal.classList.contains('hidden')) {
+            if (e.target.id === 'btnCloseStaticContent' || e.target === staticContentModal) {
+                staticContentModal.classList.add('hidden');
+            }
+        }
+    }
+
+    // --- Asignación de Eventos Globales ---
+    function setupGlobalEventListeners() {
+        // Asignar el manejador de clics para los modales a todo el documento
+        document.addEventListener('click', handleModalClicks);
+
+        // Asignar eventos que siempre deben funcionar
+        if (loginBtn) loginBtn.addEventListener('click', () => { if(loginModal) loginModal.classList.remove('hidden'); });
+        if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+        if (loginForm) loginForm.addEventListener('submit', handleLogin);
+        if (backToProjectsBtn) backToProjectsBtn.addEventListener('click', showProjectSelection);
+
+        // Evento para el formulario de comentarios (se asigna una sola vez)
+        if (commentForm) {
+            commentForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const itemId = detailsModal.dataset.itemId;
+                const textarea = commentForm.querySelector('textarea');
+                if (!itemId || !textarea) return;
+                const success = await saveComment(itemId, textarea.value);
+                if (success) {
+                    textarea.value = '';
+                    await renderRatingsAndComments(itemId);
                 }
             });
         }
-
+        
         // Asignar eventos a los enlaces del header y footer
         const staticLinks = [
             { id: 'nav-about-link', type: 'about' },
@@ -688,5 +966,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (footerYear) footerYear.textContent = new Date().getFullYear();
     }
 
+
+    // FIX: Solo llamar a checkUserSession si el elemento existe.
+    if (userSessionContainer) {
+        checkUserSession(); // Comprobar si hay un usuario logueado al cargar la página
+    }
     init();
+    setupGlobalEventListeners(); // Configurar los listeners globales después de init
 });

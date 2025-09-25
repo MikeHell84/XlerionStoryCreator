@@ -183,17 +183,23 @@ const dom = {
 // --- Gestión de datos (IndexedDB) ---
 let db;
 async function initDB() {
-    db = await idb.openDB('story-creator-db', 2, {
-        upgrade(db) {
+    db = await idb.openDB('story-creator-db', 4, {
+        upgrade(db, oldVersion, newVersion, transaction) {
             if (!db.objectStoreNames.contains('projects')) {
                 db.createObjectStore('projects');
             }
             // Añadir los object stores que faltan para consistencia con historia.js
-            if (!db.objectStoreNames.contains('ratings')) {
-                const store = db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
-                // Índice para asegurar que un usuario solo califique un ítem una vez.
-                store.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
+            const ratingsStore = db.objectStoreNames.contains('ratings')
+                ? transaction.objectStore('ratings')
+                : db.createObjectStore('ratings', { keyPath: 'id', autoIncrement: true });
+
+            if (!ratingsStore.indexNames.contains('user_item')) {
+                ratingsStore.createIndex('user_item', ['userEmail', 'itemId'], { unique: true });
             }
+            if (!ratingsStore.indexNames.contains('by_item')) {
+                ratingsStore.createIndex('by_item', 'itemId');
+            }
+
             if (!db.objectStoreNames.contains('comments')) {
                 const store = db.createObjectStore('comments', { keyPath: 'id', autoIncrement: true });
                 store.createIndex('by_project', 'projectId');
@@ -239,8 +245,16 @@ async function loadProjects() {
     }
 
     // 3. Asegurar compatibilidad y migrar datos si es necesario (como antes).
-    const tx = db.transaction(['projects', 'comments'], 'readwrite');
-    const commentsStore = tx.objectStore('comments');
+    // FIX: Cargar todos los comentarios de la BD para asociarlos a los proyectos.
+    const allComments = await db.getAll('comments');
+    const commentsByProjectId = allComments.reduce((acc, comment) => {
+        if (!acc[comment.projectId]) {
+            acc[comment.projectId] = [];
+        }
+        acc[comment.projectId].push(comment);
+        return acc;
+    }, {});
+
     let needsSaveToDb = loadedFromServer; // Si cargamos del servidor, hay que guardarlo en la BD local.
 
     const migrationPromises = loadedProjects.map(async p => {
@@ -248,26 +262,22 @@ async function loadProjects() {
             p.id = generateId();
             needsSaveToDb = true;
         }
-        // La migración de comentarios se mantiene por si se carga un proyecto antiguo.
-        if (p.comments && Array.isArray(p.comments) && p.comments.length > 0) {
-            console.log(`Migrando ${p.comments.length} comentarios para el proyecto ${p.name}`);
-            for (const oldComment of p.comments) {
-                await commentsStore.add({
-                    projectId: p.id,
-                    userEmail: oldComment.userEmail || 'Anónimo',
-                    message: oldComment.message,
-                    timestamp: oldComment.timestamp || Date.now()
-                });
-            }
-            p.comments = []; // Vaciar el array antiguo para no volver a migrarlo.
-            needsSaveToDb = true;
+        // Asociar los comentarios cargados de la BD al proyecto correspondiente.
+        // Esto asegura que la pestaña de gestión de comentarios funcione correctamente.
+        p.comments = commentsByProjectId[p.id] || [];
+
+        // Migración de calificaciones (si existe el campo antiguo)
+        if (p.ratings && Array.isArray(p.ratings)) {
+            // Aquí se podría añadir lógica para migrar `p.ratings` a la tabla `ratings`
+            // si se quisiera mantener la consistencia, similar a los comentarios.
+            // Por ahora, lo dejamos como está para no introducir más cambios.
         }
+
         if (p.chapters) p.chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
         return p;
     });
 
-  appState.projects = await Promise.all(migrationPromises);
-  await tx.done;
+    appState.projects = await Promise.all(migrationPromises);
 
   renderProjectsList();
   if (needsSaveToDb) {
@@ -2838,15 +2848,14 @@ function initMindMap(project) {
     nodes: {
         shape: 'box',
         margin: 10,
-        font: {
-            color: '#e2e8f0'
-        },
+        font: { color: '#e2e8f0' },
         color: {
             border: '#6366f1',
             background: '#2c3e50',
             highlight: {
                 border: '#a5b4fc',
-                background: '#4f46e5'
+                background: '#4f46e5',
+                font: { color: '#FFFFFF' } // Texto blanco al seleccionar
             }
         }
     },

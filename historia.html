@@ -79,7 +79,7 @@
         <div class="container mx-auto flex justify-between items-center p-4">
             <a href="#" id="logo-link" class="flex items-center gap-3 cursor-pointer">
                 <img src="favicon.ico" alt="Logo" class="h-8 w-8">
-                <span class="text-xl font-bold text-white">Xlerion´s Stories</span>
+                <span class="text-xl font-bold text-white">Xlerion´s Total Darkness</span>
             </a>
             <div class="flex items-center gap-6">
                 <nav class="hidden md:flex items-center gap-6">
@@ -87,7 +87,16 @@
                     <a href="#" id="nav-about-link" class="nav-link text-gray-300">Acerca de</a>
                     <a href="#" id="nav-contact-link" class="nav-link text-gray-300">Contacto</a>
                 </nav>
-                <!-- La sección de Login se elimina en la vista pública estática -->
+                <!-- NUEVO: Sección de sesión de usuario -->
+                <div id="user-session" class="text-sm text-white">
+                    <div class="logged-out">
+                        <button id="login-btn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-lg text-xs sm:text-sm">Iniciar Sesión</button>
+                    </div>
+                    <div class="logged-in hidden flex items-center gap-2 sm:gap-4">
+                        <span id="user-email-span" class="font-semibold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none"></span>
+                        <button id="logout-btn" class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-xs sm:text-sm">Salir</button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -135,7 +144,6 @@
             <div class="text-center">
             <img id="projectCover" src="" alt="Portada del Proyecto" class="w-full max-w-2xl mx-auto h-auto object-cover rounded-lg shadow-2xl mb-6 hidden">
                 <h1 id="projectTitle" class="text-4xl md:text-6xl font-bold tracking-tight text-white"></h1>
-                <!-- La calificación se elimina en la vista estática, ya que requiere una base de datos -->
             </div>
         </header>
 
@@ -182,19 +190,62 @@
             <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Mapa Mental de la Trama</h2>
             <div id="publicMindMapContainer" class="w-full h-[60vh] border border-gray-700 rounded-lg bg-gray-800"></div>
         </section>
-
-        <!-- La sección de comentarios se elimina en la vista estática, ya que requiere una base de datos -->
     </main>
 
-    <!-- Modal de Detalles -->
-    <div id="detailsModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
-                <h3 id="detailsTitle" class="text-2xl font-bold text-white"></h3>
-                <button id="btnCloseDetails" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
-            </div>
-            <div id="detailsBody" class="p-6 overflow-y-auto"></div>
-            <!-- La calificación de ítems se elimina en la vista estática -->
+    <!-- Modal de Inicio de Sesión -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm m-4">
+            <h2 class="text-2xl font-bold text-white mb-4">Iniciar Sesión / Registrarse</h2>
+            <p class="text-gray-400 mb-6">Ingresa tu correo para calificar y comentar. No se necesita contraseña.</p>
+            <form id="loginForm">
+                <input type="email" id="emailInput" placeholder="tu-correo@ejemplo.com" required class="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <p id="loginError" class="text-red-400 text-sm mt-2 hidden"></p>
+                <button type="submit" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg">Ingresar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Detalles (Modificado para incluir calificaciones y comentarios) -->
+    <div id="publicDetailsModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-40 hidden p-4">
+        <div class="bg-gray-900 text-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative border border-gray-700" id="publicDetailsModalContent">
+            <header class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="publicDetailsTitle" class="text-3xl font-bold text-indigo-400"></h3>
+                <button id="publicCloseDetailsModal" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </header>
+            <main id="publicDetailsBody" class="p-6 overflow-y-auto flex-grow">
+                <!-- El contenido del ítem se insertará aquí -->
+            </main>
+            <!-- NUEVA SECCIÓN DE CALIFICACIONES Y COMENTARIOS -->
+            <section id="interaction-section" class="p-6 border-t border-gray-700 bg-gray-800/50 overflow-y-auto flex-shrink-0" style="max-height: 45vh;">
+                <!-- Calificaciones -->
+                <div id="detailsRatingContainer" class="mb-6">
+                    <h4 class="font-bold text-lg mb-2 text-indigo-400">Calificaciones</h4>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <div id="average-stars" class="text-2xl flex gap-1 text-gray-600"><!-- Estrellas de promedio se insertan aquí --></div>
+                            <span class="rating-value text-gray-400 font-semibold"></span>
+                        </div>
+                        <div id="user-rating-section" class="hidden flex items-center gap-2">
+                            <p class="text-sm text-gray-300">Tu calificación:</p>
+                            <div id="user-stars" class="text-2xl flex gap-1 text-gray-500" data-item-id="">
+                                <!-- Estrellas para el usuario se insertarán aquí -->
+                            </div>
+                            <p id="user-rated-message" class="text-xs text-gray-400 ml-2 hidden"></p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Comentarios -->
+                <div id="detailsCommentsContainer">
+                    <h4 class="font-bold text-lg mb-4 text-indigo-400">Comentarios</h4>
+                    <form id="commentForm" class="hidden mb-6">
+                        <textarea id="comment-textarea" placeholder="Escribe tu comentario..." required class="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg float-right">Comentar</button>
+                    </form>
+                    <ul id="commentsList" class="space-y-4 clear-both">
+                        <!-- Los comentarios se insertarán aquí -->
+                    </ul>
+                </div>
+            </section>
         </div>
     </div>
 
