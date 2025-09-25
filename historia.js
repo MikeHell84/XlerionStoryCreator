@@ -851,7 +851,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch('data.json', { cache: 'no-store' });
                 if (response.ok) {
-                    allProjects = await response.json();
+                    const text = await response.text();
+                    if (text) {
+                        allProjects = JSON.parse(text);
+                    } else {
+                        allProjects = []; // El archivo está vacío
+                    }
                 } else {
                     throw new Error('No se pudo cargar data.json');
                 }

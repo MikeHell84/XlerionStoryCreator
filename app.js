@@ -164,6 +164,7 @@ const dom = {
   // Comments Management
   commentsManagementList: document.getElementById('commentsManagementList'),
   featuredCharactersContainer: document.getElementById('featuredCharactersContainer'),
+  noCommentsMessage: document.getElementById('no-comments-message'), // Añadido
   featuredPlacesContainer: document.getElementById('featuredPlacesContainer'),
   featuredObjectsContainer: document.getElementById('featuredObjectsContainer'),
   characterAgeChartContainer: document.getElementById('characterAgeChartContainer'),
@@ -227,9 +228,15 @@ async function loadProjects() {
     try {
         const response = await fetch('data.json', { cache: 'no-store' }); // no-store para obtener siempre la última versión
         if (response.ok) {
-            loadedProjects = await response.json();
-            loadedFromServer = true;
-            console.log('Proyectos cargados exitosamente desde el servidor.');
+            const text = await response.text();
+            if (text) { // Solo intentar parsear si hay contenido
+                loadedProjects = JSON.parse(text);
+                loadedFromServer = true;
+                console.log('Proyectos cargados exitosamente desde el servidor.');
+            } else {
+                console.log('El archivo data.json está vacío. Se continuará con la carga local si existe.');
+                loadedProjects = []; // Asegurarse de que es un array vacío
+            }
         } else {
             console.warn('No se encontró data.json en el servidor o hubo un error. Se intentará cargar desde la base de datos local.');
         }
@@ -262,10 +269,6 @@ async function loadProjects() {
             p.id = generateId();
             needsSaveToDb = true;
         }
-        // Asociar los comentarios cargados de la BD al proyecto correspondiente.
-        // Esto asegura que la pestaña de gestión de comentarios funcione correctamente.
-        p.comments = commentsByProjectId[p.id] || [];
-
         // Migración de calificaciones (si existe el campo antiguo)
         if (p.ratings && Array.isArray(p.ratings)) {
             // Aquí se podría añadir lógica para migrar `p.ratings` a la tabla `ratings`
@@ -3161,6 +3164,11 @@ function openTab(tabName) {
     // 4. Lógica especial para el mapa mental
     if (tabName === 'mindmap') {
         const project = appState.projects[appState.currentProjectIndex];
+        // Destruir la instancia anterior para evitar problemas de renderizado
+        if (appState.mindMapNetwork) {
+            appState.mindMapNetwork.destroy();
+            appState.mindMapNetwork = null;
+        }
         initMindMap(project);
     }
 
@@ -3182,61 +3190,76 @@ function openTab(tabName) {
     }
 }
 
-async function renderCommentsManagement() {
+/**
+ * Encuentra un ítem (capítulo, personaje, etc.) por su ID dentro de un proyecto.
+ * @param {object} project - El objeto del proyecto actual.
+ * @param {string} itemId - El ID del ítem a buscar.
+ * @returns {object|null} El objeto del ítem encontrado o null.
+ */
+function findItemById(project, itemId) {
+    const categories = ['chapters', 'characters', 'places', 'objects'];
+    for (const category of categories) {
+        if (project[category]) {
+            for (let i = 0; i < project[category].length; i++) {
+                const item = project[category][i];
+                // Generar un ID consistente si no existe (igual que en el backend)
+                const currentItemId = item.id || `${project.id}-${category}-${i}`;
+                if (currentItemId === itemId) {
+                    // Devolvemos el item junto con su tipo para facilitar el renderizado
+                    return { ...item, itemType: category };
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function renderCommentsManagement() {
+    const project = appState.projects[appState.currentProjectIndex];
     const container = dom.commentsManagementList;
-    if (!container) return;
+    const noCommentsMessage = dom.noCommentsMessage;
 
+    if (!container || !project) return;
+
+    // Limpiar la lista anterior, pero mantener el mensaje de "no hay comentarios"
     container.innerHTML = '';
+    if (noCommentsMessage) container.appendChild(noCommentsMessage);
 
-    // 1. Obtener todos los comentarios de la base de datos
-    const allComments = await db.getAll('comments');
-
-    // Crear un mapa para buscar nombres de proyectos eficientemente
-    const projectNames = new Map(appState.projects.map(p => [p.id, p.name]));
-
-    // Ordenar por fecha, los más nuevos primero
-    allComments.sort((a, b) => b.timestamp - a.timestamp);
-
-    if (allComments.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-8">No hay comentarios en ningún proyecto.</p>';
+    if (!project.comments || project.comments.length === 0) {
+        if (noCommentsMessage) noCommentsMessage.classList.remove('hidden');
         return;
     }
 
-    // 2. Renderizar cada comentario
-    allComments.forEach(comment => {
+    if (noCommentsMessage) noCommentsMessage.classList.add('hidden');
+
+    // Ordenar comentarios del más reciente al más antiguo
+    const sortedComments = [...project.comments].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    sortedComments.forEach(comment => {
+        const item = findItemById(project, comment.itemId);
+        const itemName = item ? item.name : 'Elemento Desconocido';
+        const itemType = item ? (item.itemType.charAt(0).toUpperCase() + item.itemType.slice(1, -1)) : 'General';
+
         const commentCard = document.createElement('div');
-        commentCard.className = 'bg-[#242424] p-4 rounded-lg border border-gray-700 flex flex-col md:flex-row justify-between items-start gap-4';
-        const commentDate = new Date(comment.timestamp).toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        const projectName = projectNames.get(comment.projectId) || 'Proyecto Desconocido';
+        commentCard.className = 'comment-card p-4 rounded-lg shadow-md';
+
+        const formattedDate = new Date(comment.timestamp).toLocaleString('es-ES', {
+            day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
 
         commentCard.innerHTML = `
-            <div class="flex-grow">
-                <p class="text-gray-300 whitespace-pre-wrap">"${comment.message}"</p>
-                <p class="text-sm text-gray-500 mt-2">
-                    Por <strong class="text-indigo-400">${comment.userEmail}</strong> en el proyecto 
-                    <strong class="text-green-400">${projectName}</strong>
-                    <span class="ml-2">(${commentDate})</span>
-                </p>
-            </div>
-            <div class="flex-shrink-0 flex gap-2 mt-2 md:mt-0">
-                <button class="delete-comment-btn bg-red-800 hover:bg-red-700 text-white text-xs py-1 px-3 rounded-md" data-comment-id="${comment.id}">
-                    <i class="fas fa-trash-alt mr-1"></i> Eliminar
-                </button>
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-bold text-lg text-white">${comment.message}</p>
+                    <p class="text-sm text-gray-400 mt-1">Por: <span class="font-semibold text-indigo-400">${comment.userEmail}</span></p>
+                </div>
+                <div class="text-right flex-shrink-0 ml-4">
+                    <p class="text-xs text-gray-500">${formattedDate}</p>
+                    <p class="text-sm text-gray-300 mt-1">En: <span class="font-semibold">${itemName} (${itemType})</span></p>
+                </div>
             </div>
         `;
         container.appendChild(commentCard);
-    });
-
-    // 3. Añadir event listeners para los botones de eliminar (usando el ID del comentario)
-    container.querySelectorAll('.delete-comment-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-            const commentId = parseInt(e.currentTarget.dataset.commentId, 10);
-            
-            if (confirm('¿Estás seguro de que quieres eliminar este comentario permanentemente?')) {
-                await db.delete('comments', commentId);
-                renderCommentsManagement(); // Re-renderizar la lista
-            }
-        };
     });
 }
 
