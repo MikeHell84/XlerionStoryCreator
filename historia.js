@@ -89,13 +89,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (storedEmail) {
             currentUser = storedEmail;
-            userEmailSpan.textContent = currentUser;
-            userSessionContainer.classList.remove('logged-out');
-            userSessionContainer.classList.add('logged-in');
+            if (userEmailSpan) userEmailSpan.textContent = currentUser;
+            // Oculta el botón de login y muestra la info del usuario
+            const loggedOutDiv = userSessionContainer.querySelector('.logged-out');
+            const loggedInDiv = userSessionContainer.querySelector('.logged-in');
+            if (loggedOutDiv) loggedOutDiv.classList.add('hidden');
+            if (loggedInDiv) loggedInDiv.classList.remove('hidden');
         } else {
             currentUser = null;
-            userSessionContainer.classList.remove('logged-in');
-            userSessionContainer.classList.add('logged-out');
+            // Muestra el botón de login y oculta la info del usuario
+            const loggedOutDiv = userSessionContainer.querySelector('.logged-out');
+            const loggedInDiv = userSessionContainer.querySelector('.logged-in');
+            if (loggedOutDiv) loggedOutDiv.classList.remove('hidden');
+            if (loggedInDiv) loggedInDiv.classList.add('hidden');
         }
     }
 
@@ -343,6 +349,10 @@ document.addEventListener('DOMContentLoaded', () => {
         projectSelectionScreen.classList.remove('hidden');
         document.title = "Xlerion Stories - Proyectos"; // Resetear título
 
+        // FIX: Llamar a renderProjectList para asegurar que las tarjetas de proyecto
+        // y los sliders se muestren correctamente cada vez que se vuelve a esta vista.
+        renderProjectList();
+
         // Mostrar slider si tiene contenido
         const imageSliderContainer = document.getElementById('image-slider-container');
         if (imageSliderContainer && imageSliderContainer.querySelector('.slider-image')) {
@@ -491,6 +501,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const userRatingSection = document.getElementById('user-rating-section');
         const userRatedMessage = document.getElementById('user-rated-message');
         if (currentUser) {
+            // FIX: Reiniciar el estado de "ya calificado" antes de evaluar el ítem actual.
+            // Esto asegura que si el usuario no ha calificado ESTE ítem, pueda hacerlo,
+            // incluso si ya ha calificado otros.
+            if (userStarsContainer) userStarsContainer.classList.remove('opacity-50', 'pointer-events-none');
+            if (userRatedMessage) userRatedMessage.classList.add('hidden');
+
+
             if (userRatingSection) userRatingSection.classList.remove('hidden');
             // NUEVO: Si ya ha calificado, mostrar un mensaje y deshabilitar las estrellas.
             if (userRating > 0 && userStarsContainer && userRatedMessage) {
