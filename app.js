@@ -654,10 +654,10 @@ function renderProjectDetails() {
       let totalRating = 0;
       let ratingCount = 0;
       items.forEach(item => {
-          if (item.ratings && item.ratings.length > 0) {
-              totalRating += item.ratings.reduce((sum, r) => sum + r, 0);
-              ratingCount += item.ratings.length;
-          }
+        if (item.ratings && item.ratings.length > 0) {
+            totalRating += item.ratings.reduce((sum, r) => sum + (r.rating || 0), 0);
+            ratingCount += item.ratings.length;
+        }
       });
       return { average: ratingCount > 0 ? totalRating / ratingCount : 0, count: ratingCount };
   };
@@ -3271,6 +3271,41 @@ function renderCommentsManagement() {
 }
 
 /**
+ * Elimina una calificación específica de un ítem.
+ * @param {string} itemId - El ID del ítem al que pertenece la calificación.
+ * @param {string} userEmail - El correo del usuario cuya calificación se eliminará.
+ */
+async function deleteRating(itemId, userEmail) {
+    const project = appState.projects[appState.currentProjectIndex];
+    if (!project) return;
+
+    if (!confirm(`¿Estás seguro de que quieres eliminar la calificación de "${userEmail}"? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+
+    const categories = ['chapters', 'characters', 'places', 'objects'];
+    let itemFound = false;
+
+    for (const category of categories) {
+        if (project[category]) {
+            for (let i = 0; i < project[category].length; i++) {
+                const item = project[category][i];
+                const currentItemId = item.id || `${project.id}-${category}-${i}`;
+                if (currentItemId === itemId && item.ratings) {
+                    item.ratings = item.ratings.filter(r => r.userEmail !== userEmail);
+                    itemFound = true;
+                    break;
+                }
+            }
+        }
+        if (itemFound) break;
+    }
+
+    await saveProjects();
+    renderRatingsManagement(); // Re-renderizar la lista de calificaciones
+}
+
+/**
  * Renderiza la lista de calificaciones en la pestaña "Gestión de Calificaciones".
  */
 function renderRatingsManagement() {
@@ -3330,11 +3365,19 @@ function renderRatingsManagement() {
 
         ratingCard.innerHTML = `
             <div class="flex justify-between items-center">
-                <p class="text-lg">Calificación de <span class="font-semibold text-indigo-400">${rating.userEmail}</span></p>
-                <div class="text-xl">${starsHtml}</div>
+                <div class="flex-grow">
+                    <p class="text-lg">Calificación de <span class="font-semibold text-indigo-400">${rating.userEmail}</span></p>
+                    <p class="text-sm text-gray-400 mt-1">Para el ítem: <span class="font-semibold">${rating.itemName} (${rating.itemType})</span></p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-xl">${starsHtml}</div>
+                    <button class="text-gray-500 hover:text-red-400 transition-colors" title="Eliminar calificación">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
             </div>
-            <p class="text-sm text-gray-400 mt-1">Para el ítem: <span class="font-semibold">${rating.itemName} (${rating.itemType})</span></p>
         `;
+        ratingCard.querySelector('button').addEventListener('click', () => deleteRating(rating.itemId, rating.userEmail));
         container.appendChild(ratingCard);
     });
 }
