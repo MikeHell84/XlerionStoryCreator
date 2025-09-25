@@ -222,6 +222,12 @@
         background: #6366f1 !important;
         transform: rotate(90deg);
     }
+
+    /* Estilos para la tarjeta de comentario en el panel de gestión */
+    .comment-card {
+        background-color: #242424;
+        border-left: 4px solid #4f46e5;
+    }
   </style>
 </head>
 
@@ -464,7 +470,11 @@
           <h3 class="text-2xl font-bold">Gestión de Comentarios</h3>
           <!-- Podríamos añadir filtros o un botón de recarga aquí en el futuro -->
         </div>
-        <div id="commentsManagementList" class="space-y-4"></div>
+        <div id="commentsManagementList" class="space-y-4">
+          <div id="no-comments-message" class="text-center py-12 text-gray-500 hidden">
+            <i class="fas fa-comment-slash text-4xl mb-4"></i><p>Aún no hay comentarios para este proyecto.</p>
+          </div>
+        </div>
       </div>
     </div>
   </main>
