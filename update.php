@@ -1,142 +1,141 @@
 <?php
 header('Content-Type: application/json');
 
-// --- Función para encontrar un ítem por su ID dentro de un proyecto ---
-function find_item_by_id(&$project, $itemId) {
-    $categories = ['chapters', 'characters', 'places', 'objects'];
-    foreach ($categories as $category) {
-        if (isset($project[$category])) {
-            foreach ($project[$category] as $index => &$item) {
-                // Generar un ID consistente si no existe
-                $currentItemId = isset($item['id']) ? $item['id'] : ($project['id'] . '-' . $category . '-' . $index);
-                if ($currentItemId === $itemId) {
-                    return $item;
-                }
-            }
-        }
+// --- Funciones de Ayuda ---
+
+/**
+ * Lee y decodifica el archivo data.json.
+ * @return array|null Los proyectos o null si hay un error.
+ */
+function get_projects() {
+    if (!file_exists('data.json')) {
+        return null;
     }
-    return null;
+    $json_data = file_get_contents('data.json');
+    return json_decode($json_data, true);
 }
 
-$response = ['success' => false, 'message' => 'Acción no válida.'];
-$data_file = 'data.json';
+/**
+ * Guarda los proyectos en el archivo data.json.
+ * @param array $projects El array de proyectos a guardar.
+ * @return bool True si se guardó con éxito, false en caso contrario.
+ */
+function save_projects($projects) {
+    // JSON_PRETTY_PRINT para que el archivo sea legible
+    return file_put_contents('data.json', json_encode($projects, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) !== false;
+}
 
-// Leer el cuerpo de la solicitud
+/**
+ * Envía una respuesta JSON y termina el script.
+ * @param bool $success
+ * @param string $message
+ * @param int $status_code (Opcional) Código de estado HTTP.
+ */
+function send_response($success, $message, $status_code = 200) {
+    http_response_code($status_code);
+    echo json_encode(['success' => $success, 'message' => $message]);
+    exit;
+}
+
+// --- Lógica Principal ---
+
 $input = json_decode(file_get_contents('php://input'), true);
 
-if ($input && isset($input['action'])) {
-    $fp = null;
-    try {
-        // --- Bloquear el archivo para evitar condiciones de carrera ---
-        $fp = fopen($data_file, 'r+');
-        if (!$fp || !flock($fp, LOCK_EX)) {
-            throw new Exception('No se pudo obtener acceso exclusivo al archivo de datos. Inténtalo de nuevo.');
-        }
+if (!$input || !isset($input['action'])) {
+    send_response(false, 'Acción no válida.', 400);
+}
 
-        $file_size = filesize($data_file);
-        $projects = [];
+$projects = get_projects();
+if ($projects === null) {
+    send_response(false, 'No se pudo leer el archivo de datos del proyecto.', 500);
+}
 
-        if ($file_size > 0) {
-            $projects_json = fread($fp, $file_size);
-            $projects = json_decode($projects_json, true);
-            // Validar que el JSON es un array
-            if (!is_array($projects)) {
-                throw new Exception('El archivo data.json está corrupto o no tiene el formato esperado (debe ser un array).');
-            }
-        }
+$action = $input['action'];
+$project_id = $input['projectId'] ?? null;
+$item_id = $input['itemId'] ?? null;
+$user_email = $input['userEmail'] ?? null;
 
-        $action = $input['action'];
-        $itemId = $input['itemId'];
-        $userEmail = $input['userEmail'];
+if (!$project_id || !$item_id || !$user_email) {
+    send_response(false, 'Faltan datos requeridos (projectId, itemId, userEmail).', 400);
+}
 
-        $item_found = false;
+// Buscar el proyecto
+$project_index = -1;
+foreach ($projects as $index => $p) {
+    if (isset($p['id']) && $p['id'] === $project_id) {
+        $project_index = $index;
+        break;
+    }
+}
 
-        // --- Buscar el ítem en todos los proyectos ---
-        foreach ($projects as &$project) {
-            // Asegurarse de que el proyecto es un array antes de buscar
-            if (!is_array($project)) continue;
+if ($project_index === -1) {
+    send_response(false, 'Proyecto no encontrado.', 404);
+}
 
-            $item = find_item_by_id($project, $itemId);
-            if ($item !== null) {
+// Buscar el ítem dentro del proyecto
+$item_found = false;
+$categories = ['chapters', 'characters', 'places', 'objects'];
+
+foreach ($categories as $category) {
+    if (isset($projects[$project_index][$category])) {
+        foreach ($projects[$project_index][$category] as $item_idx => &$item) {
+            // Generar un ID consistente si no existe
+            $current_item_id = $item['id'] ?? $project_id . '-' . $category . '-' . $item_idx;
+            if ($current_item_id === $item_id) {
+                
                 if ($action === 'add_rating') {
-                    $rating = $input['rating'];
-                    if (!isset($item['ratings'])) {
-                        $item['ratings'] = [];
+                    $rating = $input['rating'] ?? null;
+                    if ($rating === null || !is_numeric($rating) || $rating < 1 || $rating > 5) {
+                        send_response(false, 'Calificación no válida.', 400);
                     }
 
-                    // Comprobar si el usuario ya ha calificado este ítem
-                    $already_rated = false;
+                    if (!isset($item['ratings'])) $item['ratings'] = [];
+
+                    // Verificar si el usuario ya calificó este ítem
                     foreach ($item['ratings'] as $r) {
-                        if (isset($r['userEmail']) && $r['userEmail'] === $userEmail) {
-                            $already_rated = true;
-                            break;
+                        if ($r['userEmail'] === $user_email) {
+                            send_response(false, 'Ya has calificado este elemento.');
                         }
                     }
 
-                    if ($already_rated) {
-                        $response['message'] = 'Ya has calificado este ítem.';
-                    } else {
-                        $item['ratings'][] = ['userEmail' => $userEmail, 'rating' => (int)$rating];
-                        $response = ['success' => true, 'message' => 'Calificación guardada.'];
-                    }
+                    // Añadir la nueva calificación
+                    $item['ratings'][] = ['userEmail' => $user_email, 'rating' => (int)$rating];
+                    $item_found = true;
+                    break 2; // Salir de ambos bucles foreach
+
                 } elseif ($action === 'add_comment') {
-                    $message = $input['message'];
-                    if (!isset($project['comments'])) {
-                        $project['comments'] = [];
+                    $message = $input['message'] ?? null;
+                    $timestamp = $input['timestamp'] ?? time() * 1000;
+
+                    if (!$message || trim($message) === '') {
+                        send_response(false, 'El mensaje del comentario no puede estar vacío.', 400);
                     }
 
-                    // Comprobar si el usuario ya ha comentado en este ítem específico
-                    $already_commented = false;
-                    foreach ($project['comments'] as $c) {
-                        if (isset($c['itemId'], $c['userEmail']) && $c['itemId'] === $itemId && $c['userEmail'] === $userEmail) {
-                            $already_commented = true;
-                            break;
-                        }
-                    }
+                    if (!isset($projects[$project_index]['comments'])) $projects[$project_index]['comments'] = [];
 
-                    if ($already_commented) {
-                        $response['message'] = 'Ya has comentado en este ítem.';
-                    } else {
-                        // Sanitizar el mensaje para evitar problemas de seguridad básicos
-                        $sanitized_message = htmlspecialchars(strip_tags($message));
-                        $project['comments'][] = [
-                            'itemId' => $itemId,
-                            'userEmail' => $userEmail,
-                            'message' => $sanitized_message,
-                            'timestamp' => $input['timestamp']
-                        ];
-                        $response = ['success' => true, 'message' => 'Comentario guardado.'];
-                    }
+                    // Añadir el nuevo comentario al array de comentarios del proyecto
+                    $projects[$project_index]['comments'][] = [
+                        'itemId' => $item_id,
+                        'userEmail' => $user_email,
+                        'message' => $message,
+                        'timestamp' => $timestamp
+                    ];
+                    $item_found = true;
+                    break 2; // Salir de ambos bucles foreach
                 }
-                $item_found = true;
-                break; // Salir del bucle de proyectos una vez que se encuentra y procesa el ítem
             }
-        }
-
-        if (!$item_found) {
-            $response['message'] = 'El ítem especificado no fue encontrado en ningún proyecto.';
-        }
-
-        // --- Guardar los cambios en el archivo solo si la operación fue exitosa ---
-        if ($response['success']) {
-            // Volver al inicio del archivo para sobrescribir
-            rewind($fp);
-            // Truncar el archivo al tamaño actual de los datos a escribir
-            ftruncate($fp, 0);
-            fwrite($fp, json_encode($projects, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        }
-    } catch (Exception $e) {
-        // Capturar cualquier error y establecer un mensaje de respuesta
-        http_response_code(500); // Internal Server Error
-        $response = ['success' => false, 'message' => 'Error del servidor: ' . $e->getMessage()];
-    } finally {
-        // Asegurarse de que el bloqueo siempre se libere y el archivo se cierre
-        if ($fp) {
-            flock($fp, LOCK_UN); // Liberar el bloqueo
-            fclose($fp);
         }
     }
 }
 
-echo json_encode($response);
+if ($item_found) {
+    if (save_projects($projects)) {
+        send_response(true, 'Acción completada con éxito.');
+    } else {
+        send_response(false, 'Error al guardar los datos del proyecto.', 500);
+    }
+} else {
+    send_response(false, 'Ítem no encontrado.', 404);
+}
+
 ?>

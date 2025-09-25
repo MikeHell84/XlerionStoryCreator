@@ -151,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'add_rating',
+                projectId: currentProject.id, // <-- AÑADIDO: Enviar el ID del proyecto
                     itemId,
                     userEmail: currentUser,
                     rating
@@ -195,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'add_comment',
+                projectId: currentProject.id, // <-- AÑADIDO: Enviar el ID del proyecto
                     itemId,
                     userEmail: currentUser,
                     message,
