@@ -157,16 +157,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- NUEVO: Funciones para Calificaciones y Comentarios ---
     // Guarda una calificación, asegurando que el usuario no haya calificado antes.
-    async function saveRating(itemId, rating) { 
-        if (!currentUser || !db) return false;
-        const tx = db.transaction('ratings', 'readwrite');
-        const store = tx.objectStore('ratings');
-        const existing = await store.index('user_item').get([currentUser, itemId]);
-        if (existing) return false; // El usuario ya ha calificado, no se permite cambiar.
-        
-        await store.add({ userEmail: currentUser, itemId, rating });
-        await tx.done;
-        return true;
+    async function saveRating(itemId, rating) {
+        if (!currentUser) return false;
+
+        try {
+            const response = await fetch('update.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'add_rating',
+                    projectId: currentProject.id,
+                    itemId: itemId,
+                    userEmail: currentUser,
+                    rating: rating
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error del servidor al guardar la calificación.');
+            }
+
+            const result = await response.json();
+            if (result.success) {
+                // Opcional: Actualizar localmente para reflejo inmediato sin recargar.
+                // Buscamos el ítem en el proyecto actual y añadimos la calificación.
+                for (const category of ['chapters', 'characters', 'places', 'objects']) {
+                    const item = currentProject[category]?.find(i => (i.id || `${currentProject.id}-${category}-${currentProject[category].indexOf(i)}`) === itemId);
+                    if (item) {
+                        if (!item.ratings) item.ratings = [];
+                        item.ratings.push({ userEmail: currentUser, rating });
+                        break;
+                    }
+                }
+                return true;
+            } else {
+                alert(result.message); // Mostrar mensaje si el usuario ya votó
+                return false;
+            }
+        } catch (error) {
+            console.error("Error al guardar la calificación:", error);
+            alert(error.message);
+            return false;
+        }
     }
 
     // Guarda un comentario, asegurando que el usuario no haya comentado antes.
@@ -174,7 +207,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentUser || !message.trim() || !db) return false; // Validaciones básicas
         try {
             await db.add('comments', { projectId: currentProject.id, itemId, userEmail: currentUser, message, timestamp: Date.now() });
-            return true;
+            const response = await fetch('update.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'add_comment',
+                    projectId: currentProject.id,
+                    itemId: itemId,
+                    userEmail: currentUser,
+                    message: message,
+                    timestamp: Date.now()
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error del servidor al guardar el comentario.');
+            }
+
+            const result = await response.json();
+            if (result.success) {
+                if (!currentProject.comments) currentProject.comments = [];
+                currentProject.comments.push({ itemId, userEmail: currentUser, message, timestamp: Date.now() });
+                return true;
+            }
+            return false;
         } catch (error) {
             console.error("Error al guardar el comentario:", error);
             return false;
