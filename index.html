@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Metadatos PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1A1A1A">
+  <meta name="description" content="Crea y gestiona tus mundos e historias interactivas.">
+  <!-- Compatibilidad con iOS -->
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Story Creator">
   <title>Xlerion Stories</title>
 
   <!-- Tailwind -->
@@ -237,7 +246,7 @@
   <input type="file" id="importJsonInput" class="hidden" accept=".json">
 
   <!-- Botón para mostrar/ocultar la barra lateral en móviles -->
-  <button id="sidebar-toggle" class="md:hidden fixed top-4 left-4 z-50 p-2 bg-indigo-600 text-white rounded-md shadow-lg">
+  <button id="sidebar-toggle" title="Mostrar/Ocultar menú" class="md:hidden fixed top-4 left-4 z-50 p-2 bg-indigo-600 text-white rounded-md shadow-lg">
     <i class="fas fa-bars text-xl"></i>
   </button>
 
@@ -292,8 +301,8 @@
       <header class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4 relative z-20">
         <div class="flex items-center space-x-4">
           <h2 id="nombreProyecto" class="text-3xl md:text-4xl font-bold text-white"></h2>
-          <button id="btnEditarNombre" class="text-indigo-400 hover:text-indigo-300"><i class="fas fa-edit"></i></button>
-          <button id="btnEliminarProyecto" class="text-red-500 hover:text-red-400"><i class="fas fa-trash-alt"></i></button>
+          <button id="btnEditarNombre" title="Editar nombre del proyecto" class="text-indigo-400 hover:text-indigo-300"><i class="fas fa-edit"></i></button>
+          <button id="btnEliminarProyecto" title="Eliminar proyecto" class="text-red-500 hover:text-red-400"><i class="fas fa-trash-alt"></i></button>
         </div>
         <div class="relative w-full md:w-auto">
             <!-- Botón para el dropdown en móvil -->
@@ -907,6 +916,20 @@
   <!-- Cargar los datos de ejemplo para que la app pueda inicializar la base de datos -->
   <!-- DEBE cargarse ANTES de app.js -->
   <script src="data.js"></script>
+  <script>
+    // Registro del Service Worker para la PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registrado con éxito:', registration);
+          })
+          .catch(error => {
+            console.log('Error al registrar el Service Worker:', error);
+          });
+      });
+    }
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

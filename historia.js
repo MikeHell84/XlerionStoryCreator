@@ -532,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const star = document.createElement('i');
                 star.className = `fas fa-star cursor-pointer ${i <= userRating ? 'text-yellow-400' : 'text-gray-500 hover:text-yellow-300'}`;
                 star.dataset.value = i; // Asignar el valor de la estrella
+                star.setAttribute('title', `Calificar con ${i} estrella${i > 1 ? 's' : ''}`);
 
                 // Función para manejar el clic o toque
                 const handleRatingClick = async (event) => {
