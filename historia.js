@@ -868,6 +868,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Inicialización ---
     async function init() {
+        await initDB(); // Asegurarse de que la BD esté lista primero.
+        checkUserSession(); // Comprobar la sesión del usuario DESPUÉS de inicializar la BD.
+
         // Ocultar el loader y mostrar el contenido principal
         // Se hace al principio para que el usuario vea algo mientras se procesan los datos.
         loadingScreen.classList.add('hidden');
@@ -1036,11 +1039,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (footerYear) footerYear.textContent = new Date().getFullYear();
     }
 
-
-    // FIX: Solo llamar a checkUserSession si el elemento existe.
-    if (userSessionContainer) {
-        checkUserSession(); // Comprobar si hay un usuario logueado al cargar la página
-    }
     init();
     setupGlobalEventListeners(); // Configurar los listeners globales después de init
 });
