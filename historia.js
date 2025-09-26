@@ -797,6 +797,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Lógica del Slider de Comentarios en la pantalla de selección ---
+
+    function showRandomComment() {
+        if (allComments.length === 0) return;
+
+        const commentSlider = document.getElementById('comment-slider');
+        if (!commentSlider) return;
+
+        // Elige un comentario al azar
+        const randomIndex = Math.floor(Math.random() * allComments.length);
+        const comment = allComments[randomIndex];
+
+        // Crea el nuevo elemento de comentario
+        const newSlide = document.createElement('div');
+        newSlide.className = 'comment-slide flex flex-col justify-center';
+        newSlide.innerHTML = `
+            <p class="text-xl italic text-gray-200">"${comment.message}"</p>
+            <p class="text-right text-sm text-gray-400 mt-2">- ${comment.author || 'Anónimo'} en <span class="font-semibold text-indigo-400">${comment.projectName}</span></p>
+        `;
+
+        // Gestiona la transición de fundido
+        const oldSlide = commentSlider.querySelector('.comment-slide.active');
+        if (oldSlide) {
+            oldSlide.classList.remove('active');
+            // Elimina el slide antiguo después de que la transición termine para no acumular elementos
+            setTimeout(() => {
+                if (oldSlide.parentElement === commentSlider) {
+                    commentSlider.removeChild(oldSlide);
+                }
+            }, 700); // Debe coincidir con la duración de la transición en CSS
+        }
+
+        commentSlider.appendChild(newSlide);
+        // Forzar un 'reflow' del navegador para que la transición se aplique correctamente al nuevo elemento
+        void newSlide.offsetWidth; 
+        newSlide.classList.add('active');
+    }
+
+    function startCommentSlider() {
+        const container = document.getElementById('comment-slider-container');
+        if (!container) return;
+
+        if (allComments.length > 0) {
+            container.classList.remove('hidden');
+            if (commentSliderInterval) clearInterval(commentSliderInterval);
+            showRandomComment();
+            commentSliderInterval = setInterval(showRandomComment, 7000);
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
     // --- Lógica del Mapa Mental Público ---
 
     function initPublicMindMap(project) {
