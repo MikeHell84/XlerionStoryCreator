@@ -1,49 +1,99 @@
-// --- LÓGICA DE AUTENTICACIÓN ---
+// --- LÓGICA DE AUTENTICACIÓN CON FIREBASE ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-const AUTH_KEY = 'xlerion_story_creator_auth';
+// --- PASO 1: CONFIGURACIÓN DE FIREBASE (ACCIÓN REQUERIDA) ---
+// Pega aquí el objeto de configuración que obtuviste de la consola de Firebase.
+const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_AUTH_DOMAIN",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_STORAGE_BUCKET",
+    messagingSenderId: "TU_MESSAGING_SENDER_ID",
+    appId: "TU_APP_ID"
+};
 
-function checkAuth() {
-    const isAuthenticated = sessionStorage.getItem(AUTH_KEY);
+// Inicializar Firebase
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+
+// --- GESTIÓN DE SESIÓN ---
+onAuthStateChanged(auth, (user) => {
     const loginScreen = document.getElementById('login-screen');
     const appContainer = document.getElementById('app-container');
 
-    if (isAuthenticated) {
+    if (user) {
+        // El usuario ha iniciado sesión
+        console.log('Usuario autenticado:', user.email);
         loginScreen.classList.add('hidden');
         appContainer.classList.remove('hidden');
     } else {
+        // El usuario ha cerrado sesión o no está autenticado
+        console.log('No hay usuario autenticado.');
         loginScreen.classList.remove('hidden');
         appContainer.classList.add('hidden');
     }
+});
+
+function getFirebaseErrorMessage(errorCode) {
+    switch (errorCode) {
+        case 'auth/invalid-email': return 'El formato del correo electrónico no es válido.';
+        case 'auth/user-not-found': return 'No se encontró ningún usuario con este correo.';
+        case 'auth/wrong-password': return 'La contraseña es incorrecta.';
+        case 'auth/email-already-in-use': return 'Este correo electrónico ya está registrado.';
+        case 'auth/weak-password': return 'La contraseña debe tener al menos 6 caracteres.';
+        case 'auth/popup-closed-by-user': return 'El proceso de inicio de sesión fue cancelado.';
+        default: return 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo.';
+    }
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
     event.preventDefault();
-    const usernameInput = document.getElementById('username');
+    const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const errorMessage = document.getElementById('login-error-message');
 
-    // --- CREDENCIALES ---
-    // ADVERTENCIA: Esto no es seguro para producción.
-    // En un futuro, deberías reemplazar esto con un sistema de autenticación real.
-    const validUsername = 'admin';
-    const validPassword = 'password123';
-
-    if (usernameInput.value === validUsername && passwordInput.value === validPassword) {
-        sessionStorage.setItem(AUTH_KEY, 'true');
-        errorMessage.classList.add('hidden');
-        checkAuth();
-    } else {
-        errorMessage.textContent = 'Usuario o contraseña incorrectos.';
+    try {
+        await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+        // onAuthStateChanged se encargará de mostrar la app
+    } catch (error) {
+        errorMessage.textContent = getFirebaseErrorMessage(error.code);
         errorMessage.classList.remove('hidden');
     }
 }
 
-function handleLogout() {
-    sessionStorage.removeItem(AUTH_KEY);
-    // Opcional: limpiar el estado de la aplicación si es necesario
-    // appState.currentProjectIndex = null;
-    // showWelcomeScreen();
-    checkAuth();
+async function handleRegister(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const errorMessage = document.getElementById('login-error-message');
+
+    try {
+        await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+        // onAuthStateChanged se encargará de mostrar la app
+    } catch (error) {
+        errorMessage.textContent = getFirebaseErrorMessage(error.code);
+        errorMessage.classList.remove('hidden');
+    }
+}
+
+async function handleGoogleSignIn() {
+    const provider = new GoogleAuthProvider();
+    try {
+        await signInWithPopup(auth, provider);
+    } catch (error) {
+        const errorMessage = document.getElementById('login-error-message');
+        errorMessage.textContent = getFirebaseErrorMessage(error.code);
+        errorMessage.classList.remove('hidden');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -53,8 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
+    if (logoutButton) { // La función signOut de Firebase es la que cierra la sesión
+        logoutButton.addEventListener('click', () => signOut(auth));
+    }
+
+    const registerButton = document.getElementById('register-button');
+    if (registerButton) {
+        // Usamos 'click' en lugar de 'submit' porque no es el botón principal del form
+        registerButton.addEventListener('click', handleRegister);
+    }
+
+    const googleSignInButton = document.getElementById('google-signin-button');
+    if (googleSignInButton) {
+        googleSignInButton.addEventListener('click', handleGoogleSignIn);
     }
 });
 
@@ -3577,7 +3638,6 @@ if (btnExportarKDP) {
 }
 
 // --- Iniciar ---
-checkAuth(); // Primero verifica la autenticación
 loadProjects(); // Luego carga los proyectos
 
 // --- Listener de Redimensionamiento Global ---
