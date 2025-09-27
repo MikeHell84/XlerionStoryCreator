@@ -1,5 +1,5 @@
-# Cargar index.html por defecto
-DirectoryIndex index.html
-
-# Desactivar el listado de archivos y carpetas
-Options -Indexes
+ # Cargar index.html por defecto
+ DirectoryIndex index.html
+ 
+ # Desactivar el listado de archivos y carpetas
+ Options -Indexes
