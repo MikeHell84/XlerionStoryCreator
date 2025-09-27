@@ -29,12 +29,29 @@ const auth = getAuth(firebaseApp);
 onAuthStateChanged(auth, (user) => {
     const loginScreen = document.getElementById('login-screen');
     const appContainer = document.getElementById('app-container');
+    const errorMessage = document.getElementById('login-error-message');
+
+    // --- ACCIÓN REQUERIDA: Define aquí tu correo de administrador ---
+    const adminEmail = "tu-email-de-admin@example.com";
 
     if (user) {
-        // El usuario ha iniciado sesión
-        console.log('Usuario autenticado:', user.email);
-        loginScreen.classList.add('hidden');
-        appContainer.classList.remove('hidden');
+        // El usuario ha iniciado sesión, ahora verificamos si es el administrador.
+        if (user.email === adminEmail) {
+            // Es el administrador, mostrar la aplicación.
+            console.log('Administrador autenticado:', user.email);
+            loginScreen.classList.add('hidden');
+            appContainer.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+        } else {
+            // No es el administrador, cerrar sesión y mostrar error.
+            console.warn('Intento de acceso no autorizado por:', user.email);
+            signOut(auth); // Cierra la sesión del usuario no autorizado.
+            errorMessage.textContent = 'Acceso denegado. Esta cuenta no tiene permisos.';
+            errorMessage.classList.remove('hidden');
+            // Nos aseguramos de que la pantalla de login esté visible.
+            loginScreen.classList.remove('hidden');
+            appContainer.classList.add('hidden');
+        }
     } else {
         // El usuario ha cerrado sesión o no está autenticado
         console.log('No hay usuario autenticado.');
