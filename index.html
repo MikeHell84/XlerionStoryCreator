@@ -240,7 +240,40 @@
   </style>
 </head>
 
-<body class="flex h-screen overflow-hidden">
+<body class="h-screen overflow-hidden">
+
+  <!-- ========== PANTALLA DE LOGIN ========== -->
+  <div id="login-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-[1001]">
+      <div class="w-full max-w-md p-8 space-y-8 bg-gray-800 rounded-2xl shadow-lg border border-gray-700">
+          <div>
+              <h2 class="mt-6 text-center text-3xl font-extrabold text-white">
+                  Iniciar Sesión
+              </h2>
+              <p class="mt-2 text-center text-sm text-gray-400">
+                  Acceso al Creador de Historias
+              </p>
+          </div>
+          <form id="login-form" class="mt-8 space-y-6">
+              <div class="rounded-md shadow-sm -space-y-px">
+                  <div>
+                      <input id="username" name="username" type="text" required class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm rounded-t-md" placeholder="Usuario">
+                  </div>
+                  <div>
+                      <input id="password" name="password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm rounded-b-md" placeholder="Contraseña">
+                  </div>
+              </div>
+              <p id="login-error-message" class="text-red-400 text-sm text-center hidden"></p>
+              <div>
+                  <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-800">
+                      Entrar
+                  </button>
+              </div>
+          </form>
+      </div>
+  </div>
+
+  <!-- ========== CONTENIDO PRINCIPAL DE LA APP (Inicialmente oculto) ========== -->
+  <div id="app-container" class="flex h-screen overflow-hidden hidden">
 
   <!-- Input oculto para la importación de archivos JSON -->
   <input type="file" id="importJsonInput" class="hidden" accept=".json">
@@ -253,6 +286,12 @@
   <!-- Sidebar -->
   <aside id="sidebar" class="sidebar p-6 space-y-4 md:relative md:translate-x-0 fixed h-full -translate-x-full transition-transform duration-300 ease-in-out z-40">
     <h1 class="text-3xl font-bold text-indigo-400">Xlerion Story Creator</h1>
+    <!-- Botón de Cerrar Sesión -->
+    <div class="absolute top-4 right-4">
+        <button id="logout-button" title="Cerrar Sesión" class="text-gray-400 hover:text-red-500 transition-colors text-xl">
+            <i class="fas fa-sign-out-alt"></i>
+        </button>
+    </div>
     <button id="btnNuevoProyecto" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i> Nuevo Proyecto</button>
     <div class="flex-grow overflow-y-auto pr-2">
       <ul id="listaProyectos" class="space-y-3"></ul>
@@ -500,6 +539,7 @@
       </div>
     </div>
   </main>
+  </div> <!-- Fin de #app-container -->
 
  <!-- Modal genérico -->
 <div id="genericModal" class="modal-overlay">

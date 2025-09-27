@@ -1,3 +1,63 @@
+// --- LÓGICA DE AUTENTICACIÓN ---
+
+const AUTH_KEY = 'xlerion_story_creator_auth';
+
+function checkAuth() {
+    const isAuthenticated = sessionStorage.getItem(AUTH_KEY);
+    const loginScreen = document.getElementById('login-screen');
+    const appContainer = document.getElementById('app-container');
+
+    if (isAuthenticated) {
+        loginScreen.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+    } else {
+        loginScreen.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+    }
+}
+
+function handleLogin(event) {
+    event.preventDefault();
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const errorMessage = document.getElementById('login-error-message');
+
+    // --- CREDENCIALES ---
+    // ADVERTENCIA: Esto no es seguro para producción.
+    // En un futuro, deberías reemplazar esto con un sistema de autenticación real.
+    const validUsername = 'admin';
+    const validPassword = 'password123';
+
+    if (usernameInput.value === validUsername && passwordInput.value === validPassword) {
+        sessionStorage.setItem(AUTH_KEY, 'true');
+        errorMessage.classList.add('hidden');
+        checkAuth();
+    } else {
+        errorMessage.textContent = 'Usuario o contraseña incorrectos.';
+        errorMessage.classList.remove('hidden');
+    }
+}
+
+function handleLogout() {
+    sessionStorage.removeItem(AUTH_KEY);
+    // Opcional: limpiar el estado de la aplicación si es necesario
+    // appState.currentProjectIndex = null;
+    // showWelcomeScreen();
+    checkAuth();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    }
+});
+
 // --- Estado Global ---
 let appState = {
   projects: [],
@@ -3517,7 +3577,8 @@ if (btnExportarKDP) {
 }
 
 // --- Iniciar ---
-loadProjects();
+checkAuth(); // Primero verifica la autenticación
+loadProjects(); // Luego carga los proyectos
 
 // --- Listener de Redimensionamiento Global ---
 // Se asegura de que el mapa mental se reajuste si la ventana cambia de tamaño.
