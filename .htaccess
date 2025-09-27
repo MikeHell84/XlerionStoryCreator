@@ -1,8 +1,23 @@
  # Cargar index.html por defecto
  DirectoryIndex index.html
  
- # Desactivar el listado de archivos y carpetas
+ # Desactivar el listado de archivos y carpetas para mayor seguridad
  Options -Indexes
+ 
+ # --- POLÍTICAS DE CACHÉ MODERNAS ---
+ # Eliminar el header Pragma obsoleto que causa la advertencia.
+ Header unset Pragma
+ 
+ # Forzar la revalidación de archivos críticos para que la PWA se actualice correctamente.
+ # El navegador siempre pedirá una nueva versión de estos archivos.
+ <FilesMatch "\.(html|js|json)$">
+   Header set Cache-Control "no-cache, no-store, must-revalidate"
+ </FilesMatch>
+ 
+ # Permitir que los assets estáticos (imágenes, fuentes) se guarden en caché por un largo tiempo.
+ <FilesMatch "\.(ico|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot)$">
+   Header set Cache-Control "public, max-age=31536000, immutable"
+ </FilesMatch>
  
  # Configuración de Content Security Policy (CSP)
  # Esto permite que tu aplicación cargue todos los recursos necesarios y use 'unsafe-eval'
