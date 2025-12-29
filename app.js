@@ -1957,8 +1957,8 @@ async function verProyectoPublico() {
     // Primero, nos aseguramos de que todos los cambios estén guardados en la BD.
     await saveProjects();
 
-    // Abrimos historia.html en una nueva pestaña, pasándole el ID del proyecto.
-    const url = `historia.html?projectId=${project.id}`;
+    // Abrimos story.html en una nueva pestaña, pasándole el ID del proyecto.
+    const url = `story.html?projectId=${project.id}`;
     window.open(url, '_blank');
 }
 
@@ -3672,7 +3672,7 @@ window.addEventListener('resize', () => {
 
 // --- Listener para sincronización entre pestañas ---
 window.addEventListener('storage', (event) => {
-    // Si otra pestaña (historia.html) actualiza las calificaciones, recargamos los datos.
+    // Si otra pestaña (story.html) actualiza las calificaciones, recargamos los datos.
     if (event.key === 'xlerion-story-creator-update' && event.newValue) {
         refreshCurrentProjectData();
     }

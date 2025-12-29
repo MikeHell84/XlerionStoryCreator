@@ -28,7 +28,7 @@ fs.readFile(sourcePath, 'utf8', (err, data) => {
                 return;
             }
             console.log(`✅ ¡La información ha sido copiada de "${sourceFile}" a "${destinationFile}" con éxito!`);
-            console.log(`Ahora puedes ver el proyecto en historia.html.`);
+            console.log(`✅ Ahora puedes ver el proyecto en story.html.`);
         });
     } catch (parseErr) {
         console.error(`Error al parsear el JSON del archivo "${sourceFile}":`, parseErr);

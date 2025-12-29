@@ -2,9 +2,9 @@ const CACHE_NAME = 'xlerion-story-creator-v1';
 // Lista de archivos locales esenciales para que la aplicación funcione sin conexión.
 const urlsToCache = [
   'index.html',
-  'historia.html',
+  'story.html',
   'app.js',
-  'historia.js',
+  'story.js',
   'data.js',
   'favicon.ico',
   'icons/icon-192x192.png',
