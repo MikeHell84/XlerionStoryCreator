@@ -1,0 +1,16 @@
+{
+    "siteName": "Xlerion´s Total Darkness",
+    "theme": {
+        "accent": "#00ffcc",
+        "accentHover": "#00ccb4",
+        "bg": "#121212",
+        "surface": "#1a1a1a",
+        "surface2": "#242424",
+        "text": "#ffffff",
+        "muted": "#9ca3af",
+        "font": "system-ui",
+        "btnText": "#262626",
+        "btnSecondaryText": "#ffffff"
+    },
+    "updatedAt": 1788631048
+}
