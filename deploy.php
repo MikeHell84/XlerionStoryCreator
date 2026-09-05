@@ -215,6 +215,14 @@ if ($action === 'test') {
 if (!$token) {
     send(false, 'Sin token configurado en el servidor. Configura GITHUB_TOKEN primero.', ['setup' => $setupSteps], 200);
 }
+// Publicar decenas de archivos (data.json pesa MB) supera los 30 s que
+// php -S impone por defecto. Se amplía solo para esta acción.
+if (function_exists('set_time_limit')) {
+    @set_time_limit(600);
+}
+if (function_exists('ignore_user_abort')) {
+    @ignore_user_abort(true);
+}
 
 // Sincronización del sitio COMPLETO: se recorre el directorio y se sube
 // todo menos la lista de exclusión (secretos, cachés, utilidades locales).
