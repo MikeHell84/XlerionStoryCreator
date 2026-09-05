@@ -18,6 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let allComments = []; // Caché para todos los comentarios de los proyectos
     let commentSliderInterval; // Intervalo para el slider de comentarios
 
+    // Escapa texto de usuario antes de inyectarlo como HTML (anti-XSS).
+    function escapeHtml(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     const loadingScreen = document.getElementById('loading'); // Pantalla de carga
     const storyContent = document.getElementById('storyContent');
     const projectSelectionScreen = document.getElementById('projectSelectionScreen');
@@ -42,10 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // FIX: Se define dbPromise fuera para que sea accesible globalmente en este script.
 
     async function initDB() {
-        // Reutilizamos la configuración de la base de datos de app.js
-        // para asegurar la consistencia.
+        // Esquema unificado con app.js (misma BD, misma versión, mismos stores).
+        // Se incluye 'projects' para que la vista pública funcione aunque se
+        // visite antes que el editor.
         db = await idb.openDB('story-creator-db', 4, {
             upgrade(db, oldVersion, newVersion, transaction) {
+                if (!db.objectStoreNames.contains('projects')) {
+                    db.createObjectStore('projects');
+                }
                 // Lógica de actualización mejorada para 'ratings'
                 const ratingsStore = db.objectStoreNames.contains('ratings')
                     ? transaction.objectStore('ratings')
@@ -600,12 +614,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const li = document.createElement('li');
                 li.className = 'bg-gray-800 p-3 rounded-lg';
+                // Escapar contenido de usuario para evitar XSS desde data.json.
+                const safeMsg = escapeHtml(comment.message || '');
+                const safeEmail = escapeHtml(comment.userEmail || 'Anónimo');
                 li.innerHTML = `
                     <div class="flex justify-between items-center">
-                        <p class="text-gray-300 flex-grow">${comment.message}</p>
+                        <p class="text-gray-300 flex-grow">${safeMsg}</p>
                         ${ratingDisplayHtml}
                     </div>
-                    <p class="text-xs text-gray-500 mt-1 text-right">- ${comment.userEmail} (${new Date(comment.timestamp).toLocaleString()})</p>
+                    <p class="text-xs text-gray-500 mt-1 text-right">- ${safeEmail} (${new Date(comment.timestamp).toLocaleString()})</p>
                 `;
                 commentsList.appendChild(li);
             });
@@ -758,64 +775,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const randomIndex = Math.floor(Math.random() * allComments.length);
         const comment = allComments[randomIndex];
 
-        // Crea el nuevo elemento de comentario
+        // Crea el nuevo elemento de comentario (escapado anti-XSS)
         const newSlide = document.createElement('div');
         newSlide.className = 'comment-slide flex flex-col justify-center';
         newSlide.innerHTML = `
-            <p class="text-xl italic text-gray-200">"${comment.message}"</p>
-            <p class="text-right text-sm text-gray-400 mt-2">- ${comment.author || 'Anónimo'} en <span class="font-semibold text-indigo-400">${comment.projectName}</span></p>
-        `;
-
-        // Gestiona la transición de fundido
-        const oldSlide = commentSlider.querySelector('.comment-slide.active');
-        if (oldSlide) {
-            oldSlide.classList.remove('active');
-            // Elimina el slide antiguo después de que la transición termine para no acumular elementos
-            setTimeout(() => {
-                if (oldSlide.parentElement === commentSlider) {
-                    commentSlider.removeChild(oldSlide);
-                }
-            }, 700); // Debe coincidir con la duración de la transición en CSS
-        }
-
-        commentSlider.appendChild(newSlide);
-        // Forzar un 'reflow' del navegador para que la transición se aplique correctamente al nuevo elemento
-        void newSlide.offsetWidth; 
-        newSlide.classList.add('active');
-    }
-
-    function startCommentSlider() {
-        const container = document.getElementById('comment-slider-container');
-        if (!container) return;
-
-        if (allComments.length > 0) {
-            container.classList.remove('hidden');
-            if (commentSliderInterval) clearInterval(commentSliderInterval);
-            showRandomComment();
-            commentSliderInterval = setInterval(showRandomComment, 7000);
-        } else {
-            container.classList.add('hidden');
-        }
-    }
-
-    // --- Lógica del Slider de Comentarios en la pantalla de selección ---
-
-    function showRandomComment() {
-        if (allComments.length === 0) return;
-
-        const commentSlider = document.getElementById('comment-slider');
-        if (!commentSlider) return;
-
-        // Elige un comentario al azar
-        const randomIndex = Math.floor(Math.random() * allComments.length);
-        const comment = allComments[randomIndex];
-
-        // Crea el nuevo elemento de comentario
-        const newSlide = document.createElement('div');
-        newSlide.className = 'comment-slide flex flex-col justify-center';
-        newSlide.innerHTML = `
-            <p class="text-xl italic text-gray-200">"${comment.message}"</p>
-            <p class="text-right text-sm text-gray-400 mt-2">- ${comment.author || 'Anónimo'} en <span class="font-semibold text-indigo-400">${comment.projectName}</span></p>
+            <p class="text-xl italic text-gray-200">"${escapeHtml(comment.message)}"</p>
+            <p class="text-right text-sm text-gray-400 mt-2">- ${escapeHtml(comment.author || 'Anónimo')} en <span class="font-semibold text-indigo-400">${escapeHtml(comment.projectName)}</span></p>
         `;
 
         // Gestiona la transición de fundido
@@ -919,10 +884,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Tema publicado desde el panel (theme.json). Silencioso si no existe:
+    // la página usa su diseño por defecto.
+    async function applyPublicTheme() {
+        try {
+            const res = await fetch('theme.json', { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            const t = data && data.theme;
+            if (!t || typeof t !== 'object') return;
+            const ok = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+            const accent = ok(t.accent) ? t.accent : '#6366f1';
+            const accentHover = ok(t.accentHover) ? t.accentHover : '#4338ca';
+            const bg = ok(t.bg) ? t.bg : '#111827';
+            const surface = ok(t.surface) ? t.surface : '#1F2937';
+            const surface2 = ok(t.surface2) ? t.surface2 : '#374151';
+            const text = ok(t.text) ? t.text : '#E5E7EB';
+            const btnText = ok(t.btnText) ? t.btnText : '#ffffff';
+            const font = (typeof t.font === 'string' && t.font) ? t.font : 'Inter';
+            let styleEl = document.getElementById('xlerion-public-theme');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'xlerion-public-theme';
+                document.head.appendChild(styleEl);
+            }
+            styleEl.textContent =
+                'body{background:' + bg + '!important;color:' + text + '!important;font-family:' + font + ',Inter,sans-serif!important;}' +
+                '.site-header{background:' + surface + '!important;}' +
+                '.site-footer{background:' + bg + '!important;}' +
+                '.content-card{background:' + surface + '!important;border-color:' + surface2 + '!important;}' +
+                '.bg-indigo-600,.bg-indigo-500{background-color:' + accent + '!important;color:' + btnText + '!important;}' +
+                '.hover\\:bg-indigo-600:hover,.hover\\:bg-indigo-700:hover{background-color:' + accentHover + '!important;}' +
+                '.text-indigo-300,.text-indigo-400{color:' + accent + '!important;}' +
+                '.prose-custom a{color:' + accent + '!important;}';
+        } catch (e) { /* sin tema publicado */ }
+    }
+
     // --- Inicialización ---
     async function init() {
         await initDB(); // Asegurarse de que la BD esté lista primero.
         checkUserSession(); // Comprobar la sesión del usuario DESPUÉS de inicializar la BD.
+        applyPublicTheme(); // Diseño del panel (no bloquea la carga).
 
         // Ocultar el loader y mostrar el contenido principal
         // Se hace al principio para que el usuario vea algo mientras se procesan los datos.
