@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universo Interactivo de Xlerion's Total Darkness</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Fonts: Manrope -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #000000;
+            color: #E5E7EB;
+        }
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            z-index: -1;
+        }
+        .section-title {
+            border-left: 4px solid #00A9FF;
+            padding-left: 1rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+        .nav-link {
+            color: #D1D5DB;
+            transition: color 0.3s, border-bottom-color 0.3s;
+            border-bottom: 2px solid transparent;
+            padding-bottom: 4px;
+        }
+        .nav-link:hover {
+            color: #FFFFFF;
+            border-bottom-color: #00A9FF;
+        }
+        .hero {
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .hero-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+            z-index: 1;
+        }
+        .hero-bg.active {
+            opacity: 0.5;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            padding: 1rem;
+        }
+        .character-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.5rem;
+            cursor: pointer;
+        }
+        .character-card img {
+            transition: transform 0.5s ease;
+        }
+        .character-card:hover img {
+            transform: scale(1.1);
+        }
+        .character-card .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 1.5rem;
+        }
+        .timeline-item-new {
+            position: relative;
+            padding-bottom: 1rem;
+        }
+        .timeline-item-new:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            left: 1.25rem;
+            top: 1.25rem;
+            width: 2px;
+            height: calc(100% - 1rem);
+            background-color: #374151;
+        }
+        .timeline-header {
+            display: flex;
+            gap: 1.5rem;
+            cursor: pointer;
+        }
+        .timeline-dot-new {
+            width: 2.5rem;
+            height: 2.5rem;
+            flex-shrink: 0;
+            background-color: #374151;
+            border: 2px solid #374151;
+            border-radius: 9999px;
+            z-index: 10;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .timeline-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out, padding 0.5s ease-in-out;
+            padding-left: calc(2.5rem + 1.5rem);
+        }
+        .timeline-item-new.expanded .timeline-dot-new {
+            background-color: #00A9FF;
+            border-color: #00A9FF;
+        }
+        .timeline-item-new.expanded .timeline-details {
+            max-height: 500px; /* Adjust as needed */
+            padding-top: 1rem;
+            padding-bottom: 2rem;
+        }
+        .info-card {
+            background-color: rgba(17, 24, 39, 0.5);
+            border: 1px solid #374151;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .info-card.interactive:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 169, 255, 0.1);
+            cursor: pointer;
+        }
+        .gallery-item {
+            background-color: #1F2937;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+        .gallery-item:hover {
+            transform: scale(1.05);
+        }
+        .gallery-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .gallery-item:hover::after {
+            opacity: 1;
+        }
+        .footer-icon {
+            color: #9CA3AF;
+            transition: color 0.3s ease;
+        }
+        .footer-icon:hover {
+            color: #FFFFFF;
+        }
+        /* Page transition styles */
+        #main-content {
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+        }
+        .detail-page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 100;
+            overflow-y: auto;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        .detail-page.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="particles-js"></div>
+
+    <div id="main-content">
+        <!-- Menú de Navegación -->
+        <nav class="fixed top-0 w-full z-50 bg-black/50 backdrop-blur-md">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-20">
+                    <div class="flex-shrink-0">
+                        <a href="#" class="text-3xl font-extrabold text-white tracking-wider">XLERION</a>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="ml-10 flex items-baseline space-x-6">
+                            <a href="#story-section" class="nav-link text-xs font-bold uppercase tracking-widest">Historia</a>
+                            <a href="#characters-section" class="nav-link text-xs font-bold uppercase tracking-widest">Personajes</a>
+                            <a href="#timeline-section" class="nav-link text-xs font-bold uppercase tracking-widest">Cronología</a>
+                            <a href="#world-section" class="nav-link text-xs font-bold uppercase tracking-widest">Mundo</a>
+                            <a href="#system-section" class="nav-link text-xs font-bold uppercase tracking-widest">Sistema</a>
+                            <a href="#gallery-section" class="nav-link text-xs font-bold uppercase tracking-widest">Galería</a>
+                        </div>
+                    </div>
+                    <div class="-mr-2 flex md:hidden">
+                        <button id="mobile-menu-button" type="button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none">
+                            <span class="sr-only">Abrir menú</span>
+                            <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                            <svg class="hidden h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="md:hidden hidden" id="mobile-menu">
+                <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-900">
+                    <a href="#story-section" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Historia</a>
+                    <a href="#characters-section" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Personajes</a>
+                    <a href="#timeline-section" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Cronología</a>
+                    <a href="#world-section" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Mundo</a>
+                    <a href="#system-section" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Sistema</a>
+                    <a href="#gallery-section" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Galería</a>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Hero Section -->
+        <header class="hero">
+            <div id="hero-images-container"></div>
+            <div class="hero-content">
+                <h1 class="text-5xl md:text-8xl font-extrabold text-white tracking-widest uppercase">Total Darkness</h1>
+                <p class="text-lg text-gray-200 mt-4 max-w-2xl mx-auto">Un universo sobre la elección, el destino y el eco eterno de un error divino.</p>
+            </div>
+        </header>
+
+        <main class="relative z-10 bg-black">
+            <div class="container mx-auto p-4 md:p-8">
+            
+                <!-- Sección de Historia -->
+                <section id="story-section" class="my-16 md:my-32">
+                    <div id="story-summary-container" class="text-center max-w-3xl mx-auto cursor-pointer group">
+                        <h2 class="text-4xl md:text-5xl font-extrabold text-white">La Caída de un Universo</h2>
+                        <p class="text-gray-400 mt-6 text-lg">Desde la creación y la armonía hasta una guerra que amenaza con consumirlo todo, la historia de Xlerion's Total Darkness es una saga cósmica. Sumérgete en el relato completo de cómo un acto de amor y miedo fracturó la realidad para siempre.</p>
+                        <p class="text-blue-400 font-semibold mt-6 group-hover:text-white transition-colors">Leer la historia completa &rarr;</p>
+                    </div>
+                </section>
+
+                <!-- Sección de Personajes -->
+                <section id="characters-section" class="my-16 md:my-32">
+                    <h2 class="section-title text-3xl md:text-4xl text-white mb-12">Protagonistas del Destino</h2>
+                    <div id="characters-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Las tarjetas de personaje se insertarán aquí -->
+                    </div>
+                </section>
+                
+                <!-- Sección de Gráfico Comparativo -->
+                <section id="charts-section" class="my-16 md:my-32">
+                     <h2 class="section-title text-3xl md:text-4xl text-white mb-12">Psique Comparada</h2>
+                    <div class="bg-gray-900/50 p-6 rounded-lg shadow-xl border border-gray-700">
+                        <canvas id="consciousnessRadarChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Sección de Línea de Tiempo -->
+                <section id="timeline-section" class="my-16 md:my-32">
+                    <h2 class="section-title text-3xl md:text-4xl text-white mb-16">Fragmentos del Tiempo</h2>
+                    <div id="timeline-container" class="max-w-3xl mx-auto">
+                        <!-- Los eventos se insertarán aquí -->
+                    </div>
+                </section>
+
+                <!-- Sección de Mundo -->
+                <section id="world-section" class="my-16 md:my-32">
+                    <h2 class="section-title text-3xl md:text-4xl text-white mb-12">El Universo</h2>
+                    <div id="world-cards-container" class="space-y-8">
+                        <!-- Las tarjetas del mundo se insertarán aquí -->
+                    </div>
+                </section>
+
+                <!-- Sección de Sistema -->
+                <section id="system-section" class="my-16 md:my-32">
+                    <h2 class="section-title text-3xl md:text-4xl text-white mb-12">Leyes del Cosmos</h2>
+                    <div id="system-cards-container" class="grid md:grid-cols-2 gap-8">
+                        <!-- Las tarjetas de sistema se insertarán aquí dinámicamente -->
+                    </div>
+                </section>
+
+                <!-- Sección de Galería -->
+                <section id="gallery-section" class="my-16 md:my-32">
+                    <h2 class="section-title text-3xl md:text-4xl text-white mb-12">Galería de Arte Conceptual</h2>
+                    <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <!-- Los items de la galería se insertarán aquí dinámicamente -->
+                    </div>
+                </section>
+
+            </div>
+        </main>
+
+        <footer class="bg-[#0c141a] text-gray-400">
+            <div class="bg-[#1a2831] py-4 text-center">
+                <a href="#" class="font-bold uppercase tracking-widest text-white hover:text-blue-400 transition-colors">Suscríbete al boletín de noticias</a>
+            </div>
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.72 7.97 5 10 5c2.03 0 3.488.72 4.256 1.321.77.602 1.425 1.54 1.912 2.706a6.012 6.012 0 010 3.946c-.487 1.166-1.142 2.104-1.912 2.706C13.488 14.28 12.03 15 10 15c-2.03 0-3.488-.72-4.256-1.321a6.012 6.012 0 01-1.912-2.706 6.012 6.012 0 010-3.946z" clip-rule="evenodd"></path><path d="M10 13a3 3 0 100-6 3 3 0 000 6z"></path></svg>
+                        <span>Español (ES)</span>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <a href="#" class="footer-icon"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg></a>
+                        <a href="#" class="footer-icon"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.85s-.011 3.585-.069 4.85c-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07s-3.585-.012-4.85-.07c-3.252-.148-4.771-1.691-4.919-4.919-.058-1.265-.07-1.645-.07-4.85s.012-3.585.07-4.85c.148-3.225 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.85-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948s.014 3.667.072 4.947c.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072s3.667-.014 4.947-.072c4.358-.2 6.78-2.618 6.98-6.98.059-1.281.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.2-4.358-2.618-6.78-6.98-6.98-1.281-.059-1.689-.073-4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.162 6.162 6.162 6.162-2.759 6.162-6.162-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4s1.791-4 4-4 4 1.79 4 4-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.441 1.441 1.441 1.441-.645 1.441-1.441-.645-1.44-1.441-1.44z"/></svg></a>
+                        <a href="#" class="footer-icon"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616v.064c0 2.298 1.634 4.212 3.791 4.649-.69.188-1.432.23-2.164.084.616 1.924 2.441 3.258 4.575 3.315-1.718 1.354-3.847 2.068-6.08 1.734 2.225 1.443 4.862 2.24 7.661 2.24 9.191 0 14.227-7.622 13.985-14.518 1.018-.732 1.898-1.648 2.594-2.697z"/></svg></a>
+                        <a href="#" class="footer-icon"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
+                    </div>
+                </div>
+                <hr class="border-gray-700 my-8">
+                <div class="text-center">
+                    <p class="text-2xl font-bold tracking-widest">XLERION</p>
+                </div>
+                <div class="flex justify-center items-center flex-wrap gap-8 my-8 text-gray-500">
+                    <!-- Placeholder logos -->
+                    <span>PS5</span>
+                    <span>EPIC</span>
+                    <span>STEAM</span>
+                    <span>SWITCH</span>
+                    <span>XBOX</span>
+                    <span>WINDOWS</span>
+                </div>
+                <div class="text-center text-xs text-gray-500 max-w-4xl mx-auto">
+                    <p class="font-bold text-base text-white mb-4">© MIKE HELLAWAITS (MIGUEL RODRIGUEZ MARTINEZ)</p>
+                    <p>Todos los personajes, eventos y nombres son ficticios. Cualquier semejanza con personas reales, vivas o muertas, o con eventos reales, es pura coincidencia.</p>
+                    <p>"Xlerion", "Total Darkness" y todos los logotipos relacionados son marcas comerciales de Mike Hellawaits.</p>
+                </div>
+                <hr class="border-gray-700 my-8">
+                <div id="footer-links-container" class="flex justify-center items-center flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400">
+                    <!-- Los enlaces se insertarán aquí dinámicamente -->
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Contenedor para las páginas de detalle -->
+    <div id="detail-page-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <script>
+        // --- ZONA EDITABLE ---
+        const headerImages = [
+            'https://placehold.co/1920x1080/000000/FFFFFF?text=Creacion',
+            'https://placehold.co/1920x1080/1a1127/FFFFFF?text=Anomalia',
+            'https://placehold.co/1920x1080/271111/FFFFFF?text=Caida',
+            'https://placehold.co/1920x1080/11271f/FFFFFF?text=Exilio',
+            'https://placehold.co/1920x1080/333333/FFFFFF?text=Guerra'
+        ];
+        const storyPageContent = `
+            <div>
+                <div class="h-96 bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080/4a1d57/FFFFFF?text=La+Saga+Completa');"></div>
+                <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                    <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-8">La Historia Completa</h2>
+                    <div class="prose prose-invert lg:prose-xl max-w-none text-gray-300 space-y-6">
+                        
+                        <h3 class="text-3xl font-bold text-blue-400 !mb-2">PRÓLOGO: CADA FIN TIENE UN COMIENZO</h3>
+                        <p class="italic">"A lo largo de mi vida, he escuchado relatos que, en su momento, solo imaginaba de manera literal. Eran palabras, ideas, explicaciones que fluían sin mayor trascendencia. Pero nunca fui realmente consciente de lo que me decían. Ahora lo entiendo. Ahora comprendo que, entre esos relatos, había algo más: un mensaje velado, una verdad que siempre estuvo ahí, esperando ser reconocido. Y en lo más profundo de mí, sé que esto debía pasar."</p>
+                        <p class="text-right font-semibold">- Adamu</p>
+                        
+                        <h4 class="text-2xl font-bold !mt-10 !mb-2">Bitácora M840927 - Adamu</h4>
+                        
+                        <!-- INICIO: Espacio para Audio -->
+                        <div class="my-6 bg-gray-900/50 p-4 rounded-lg border border-gray-700 flex items-center gap-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.636 5.636a9 9 0 0112.728 0m-12.728 0l12.728 12.728" /></svg>
+                            <div>
+                                <h5 class="font-bold text-white">Audio Bitácora M840927</h5>
+                                <p class="text-sm text-gray-400">Reproducir narración...</p>
+                            </div>
+                        </div>
+                        <!-- FIN: Espacio para Audio -->
+
+                        <p>El sonido de la guerra retumba en el aire, los gritos y exclamaciones de los soldados se ahogan bajo el fuego enemigo. Lo que alguna vez fue mi hogar, mi país, mi planeta, ahora no es más que cenizas sobre tierras y mares, un aire denso y caliente, impregnado del olor a muerte y desesperación. La tierra tiembla con la llegada de las grandes máquinas de guerra, que con sus disparos certeros agregan más sangre a la batalla, devorando a quienes quedan en pie. Escucho su comunicación, sonidos disruptivos y codificados, como una lengua que solo entienden entre ellos. Cada mensaje parece un veredicto de muerte, una orden que desintegra a los soldados sin piedad.</p>
+                        
+                        <!-- INICIO: Espacio para Imagen -->
+                        <div class="my-6 bg-gray-800 aspect-video flex items-center justify-center rounded-lg text-gray-500 flex-col">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" /></svg>
+                           <span>Espacio para futura imagen de la batalla</span>
+                        </div>
+                        <!-- FIN: Espacio para Imagen -->
+
+                        <p>Pero lo peor viene después. Las máquinas híbridas, criaturas de metal y carne, caminan entre los cuerpos, inspeccionando cada cadáver con precisión mecánica. Buscan algo. Entonces ocurre. Un sonido atroz invade el campo de batalla: el crujido desgarrador de huesos triturados, el sonido inconfundible de la carne siendo destrozada. Absorben los restos humanos, procesándolos en sus sistemas, buscando el gen perdido, tratando de reconstruir el código "Tiamatu Enuma" o "Génesis". Su eficacia es abrumadora. Pronto restaurarán el código origen, y cuando lo hagan… La humanidad estará perdida para siempre.</p>
+                        <p>La misión es clara: llegar al centro de operaciones Xlerion, buscarla, destruirla. Pero hay un problema… Estoy paralizado ante la muerte. Ella me observa, con una mirada fría, inmutable, pero en sus ojos veo un pasado que nunca viví. Y sin embargo, siempre estuve ahí. Desde el principio. Fue en ese instante cuando comprendí la clave para elegir nuestro propio destino. O aceptar una sentencia de muerte.</p>
+                        <p class="text-right font-semibold">Fin de la bitácora M840927</p>
+
+                        <h3 class="text-3xl font-bold text-blue-400 !mt-12 !mb-2">MÚLTIPLES ORÍGENES</h3>
+
+                        <!-- INICIO: Espacio para Video -->
+                        <div class="my-6 bg-black aspect-video flex items-center justify-center rounded-lg text-gray-500 flex-col border border-gray-700">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 text-white/50" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
+                           <span class="mt-2">Espacio para futuro video de la creación</span>
+                        </div>
+                        <!-- FIN: Espacio para Video -->
+
+                        <p>El universo, un ente gigantesco e incalculable, ha sido el hogar de innumerables formas de vida desde tiempos inmemoriales. En su vastedad, los humanos, los seres vivos y otras sociedades coexisten, compartiendo su existencia entre las infinitas estrellas. Durante eones, los planetas dieron cobijo a civilizaciones inimaginables, cada una adaptada a las fuerzas que regían su mundo. Hubo mundos donde la gravedad era tan intensa que sus habitantes se alzaban como titanes, de proporciones colosales. En otros, la naturaleza les forzó a volverse pequeños, evolucionando con armaduras naturales, exoesqueletos diseñados para sobrevivir a las condiciones hostiles de sus tierras. Todo funcionaba en armonía al principio…</p>
+                        <p>Pero con el tiempo, tras incontables eras, algo emergió desde lo desconocido. Una anomalía. Una raza nueva, una existencia distinta, algo que no debía ser. Su propósito en el universo desafiaría el orden, alteraría el flujo de la vida como nunca antes se había visto. Y con su llegada, el equilibrio que había perdurado desde la creación… se tambaleó.</p>
+                        <p>Una raza basada en la codicia, capaz de romper cualquier equilibrio, atravesó los límites de los mundos. Su existencia no era simplemente un parásito. Ellos crearon el sistema parasitario. No se conformaban con invadir y destruir. Moldearon la esencia del universo para alimentar su expansión, tejiendo una estructura donde el poder, la manipulación y la extracción de recursos de otras civilizaciones eran inevitables. Tomaban formas camaleónicas, infiltrándose en comunidades y sociedades, corrompiendo sus fundamentos, sembrando pensamientos contrarios a la esencia del cosmos. Las civilizaciones cayeron una por una, absorbidas por la red invisible que habían tejido. Los mundos, antes fértiles y vibrantes, se consumían, hasta quedar secos e invivibles. El orden del universo se fracturó. Los dioses, forjadores del todo, no podían permitirlo. Entonces, tomaron una decisión sin precedentes. El Gran Diluvio Universal sería la última respuesta, una contingencia extrema para eliminar la plaga de raíz. Pero antes de ejecutar su ira, enviaron un mensaje a sus creaciones. Un arca recolectaría los genes de todas las especies evolucionadas, resguardando la esencia de la vida en un planeta equilibrado, capaz de albergarlas sin peligro.</p>
+                        <p>Ese planeta fue la Tierra. Así, el universo fue bañado por la ira de los dioses. Los planetas infectados fueron destruidos, erradicando la plaga. El tiempo transcurrió, y de las semillas de la creación surgió una especie particular. A diferencia de las demás, podía relacionarse con los otros seres con facilidad. Pero lo más sorprendente... Es que creó conciencia. Primitiva, incierta, pero la crearon. El primer destello de una nueva era. Un cambio irreversible en el universo.</p>
+                        <p>Su nombre fue Adapa, el primer hombre. Junto a él apareció Ninhursag, la Madre de la fertilidad y la creación. Los dioses contemplaron su obra y encontraron un nuevo equilibrio. La Tierra, única entre los mundos, se convirtió en el pilar del universo. Adapa y Ninhursag mantenían la armonía entre todas las especies, asegurando el orden que los dioses habían concebido. Pero los dioses no querían repetir los errores del pasado. La plaga había surgido antes, y la destrucción que causó en los mundos aún estaba fresca en sus memorias. Necesitaban garantizar que esta nueva civilización no sería manipulada, que su destino no estuviera atado a las sombras del caos.</p>
+                        <p>Entonces, pusieron a prueba su creación. Crearon el libre albedrío, pero no como un regalo inmediato, sino como un experimento. Querían ver cómo Adapa y Ninhursag reaccionaban, cómo tomaban sus propias decisiones sin la intervención divina. Los observaron en acción. Vieron cómo funcionaba eficientemente, cómo la elección personal guiaba el destino de los seres sin necesidad de control externo. El experimento fue un éxito. La conciencia había surgido, la plaga no había reaparecido, y el universo parecía en paz. Entonces, decretaron una única ley universal, aquella que impediría que el mal se propagara nuevamente: El libre albedrío. Ningún ser sería forzado a actuar o pensar de una manera específica. No habría imposiciones, ni caminos únicos. Cada ser vería el sendero frente a sí y decidiría su propio destino. Con esta ley establecida, los dioses abandonaron el plano universal. En ese instante, todos los seres del cosmos fueron libres, dueños de su propia elección, pero también del destino del universo.</p>
+
+                        <h3 class="text-3xl font-bold text-blue-400 !mt-12 !mb-2">¿ELECCIÓN O DESTINO?</h3>
+                        <p>La creación divina funcionaba a la perfección: no existían el hambre, el dolor ni el sufrimiento, y la armonía entre los seres era absoluta. Adapa y Ninhursag mantenían una relación cercana con todos los seres, disfrutando plenamente de la vida que les había sido otorgada. Su comunicación con los creadores se realizaba a través de una meditación consciente. Durante una de las meditaciones de Adapa, Enki, uno de los dioses, se manifestó ante él. Enki, previamente, había acordado con los dioses del universo poner a prueba la ley del libre albedrío, pues existía la posibilidad de que la plaga parasitaria hubiera evolucionado y adquirido nuevas técnicas para infiltrarse en el sistema del universo una vez más.</p>
+                        <p>Con esto acordado, Enki habló con Adapa y le dejó en claro que el nuevo mundo que habitaba, llamado Dilmun o Edén, pertenecía a él, a Ninhursag y a los seres vivos que lo poblaban. Sin embargo, le dio un advertencia fundamental: nunca debía consumir las hierbas sagradas, pues sería una ofensa imperdonable para él y los dioses. Adapa obedeció y cumplió con el deseo de Enki.</p>
+                        <p>El tiempo transcurrió, y la nueva civilización Pluri-Originario continuó su desarrollo de manera revolucionaria, marcando un cambio sin precedentes. En uno de sus viajes por el mundo, Adapa se detuvo a meditar entre el cielo y la tierra en una montaña llamada Kilima. Allí encontró a Ninhursag, quien contemplaba con profunda gratitud el mundo que le había sido concedido. Su sonrisa modesta irradiaba felicidad y armonía, y ese momento despertó en Adapa un sentimiento desconocido. No era malo, solo... diferente. Reflexionando sobre ello, encontró una palabra que definía lo que sentía: Amor.</p>
+                        <p>Al transmitirle su hallazgo a Ninhursag, ella derramó una lágrima. Al mirarse mutuamente, ambos comprendieron que habían creado algo que ni siquiera los dioses podían sentir. Enki sintió el nacimiento de este nuevo concepto, lo que despertó en su interior algo que no podía controlar. El Amor, al ser un potencial inédito, abría la posibilidad de que los seres fueran corrompidos con mayor facilidad por la plaga parasitaria. Entender esto le llevó a una inquietante conclusión: su creación, con todo su potencial, podría convertirse en su propio exterminio.</p>
+                        <p>Los dioses percibieron el impacto del libre albedrío y el surgimiento del Amor. Prefirieron esperar resultados antes de tomar una decisión definitiva sobre un nuevo Diluvio. Enki, comprendió el propósito de esta nueva etapa y decidió formar parte de ella.</p>
+                        <p>En una ocasión, Ninhursag descubrió el jardín prohibido por Enki. En lo profundo de aquel lugar, sobre un árbol de hojas oscuras, se posaba una figura misteriosa, envuelta en sombras. La criatura no emitía sonido alguno, solo observaba a Ninhursag, con una mirada que parecía perforar su espíritu. De repente, su forma comenzó a transformarse. Su cuerpo se alargó y adoptó un movimiento rastrero, deslizándose entre las hierbas sagradas del jardín. Intrigada, Ninhursag llamó a Adapa para mostrarle aquel ser desconocido.</p>
+                        <p>Adapa, sin temor, le preguntó por su presencia en aquel lugar. La respuesta no llegó en palabras, sino en visiones transmitidas directamente a la mente de Ninhursag y Adapa. En ellas, el ser reveló un secreto oculto: el verdadero propósito de los dioses al prohibirles consumir las hierbas sagradas. Les mostró una verdad impactante. Si comían las hierbas sagradas, obtendrían el poder de crear su propio universo, un lugar moldeado por su voluntad, donde su existencia y su amor podrían trascender la eternidad.</p>
+                        <p>Adapa y Ninhursag no sintieron odio ni rebelión, sino gratitud por el mundo que les había sido concedido. Sin embargo, la criatura siguió mostrándoles posibilidades más allá de su comprensión. Les reveló un destino que los beneficiaría eternamente: si consumían las hierbas, su amor no tendría límite, podrían crear su propio cosmos y jamás serían separados por el tiempo ni la muerte. Pero había un riesgo… Si uno desaparecía sin haber consumido las hierbas, la existencia del otro perdería todo sentido. La criatura dejó en sus mentes un dilema imposible, una verdad que desafiaría incluso a los dioses.</p>
+                        <p>Este pensamiento inquietó profundamente a Adapa, quien sintió un vacío indescriptible al imaginar la ausencia de Ninhursag. Su mente había sido envenenada por el ser misterioso, corrompida por la idea de una existencia sin ella. En su desesperación, su única elección fue prevalecer junto a Ninhursag. Adapa la miró fijamente a los ojos y, a través de su pensamiento, le transmitió su inquietud. Le mostró la visión de su destino sin ella, y su alma se quebrantó en llanto. Sin embargo, Ninhursag no cayó en la influencia del ser misterioso. Con firmeza, le aseguró a Adapa que, pasara lo que pasara, siempre estarían juntos. Le demostró la pureza de su amor, sin sucumbir a tentaciones ni pensamientos intrusivos.</p>
+                        <p>Las palabras de Ninhursag calmaron repentinamente a Adapa, quien encontró paz en su declaración. Pero el ser misterioso no se rendía. Comprendió que el vínculo entre ambos era demasiado fuerte, por lo que decidió atacar desde otra dirección. De manera sigilosa, el ser se comunicó exclusivamente con Adapa, envolviéndolo con su presencia. En ese instante, se enroscó suavemente sobre el cuerpo de Ninhursag, y ella, ajena al peligro, lo acarició con delicadeza. Poco a poco, el ser se acercó a su cuello, su respiración se volvió más profunda… hasta que, de manera repentina, la atacó brutalmente, inyectándole un veneno letal. Adapa, al presenciar el ataque, sintió su mente y su cuerpo separarse, perdiendo todo control sobre sí mismo. Instintivamente, saltó sobre la criatura, completamente transformado por la furia, exigiéndole respuestas. —¡¿Por qué hiciste esto?! — gritó, en una voz que no parecía la suya.</p>
+                        <p>El ser, sin mostrar arrepentimiento, respondió de la única manera que sabía: le mostró la cura. A través de su mente, reveló el secreto de la hierba sagrada, asegurando que solo al consumirla podrían obtener la liberación absoluta, trascender la mortalidad y convertirse en los nuevos dioses, libres de la influencia de los antiguos. Adapa quedó paralizado entre la ira, la desesperación y la revelación. La decisión estaba ante él... pero, ¿era realmente suya?.</p>
+                        <p>Sumido en un torbellino de conflictos internos, Adapa sintió que su mente se fragmentaba entre la desesperación y el miedo de perder a Ninhursag. La veía sin vida, su cuerpo inmóvil ante él, y su alma se desgarraba al contemplar la posibilidad de perderla para siempre. La angustia lo consumió. Si los dioses no hacían nada, entonces él lo haría. Sin dudarlo, corrió hacia las hierbas sagradas, arrancándolas con manos temblorosas. Tomó un puñado, su respiración agitada, y con una súplica en el corazón, las acercó a los labios de Ninhursag. —Vuelve… por favor… — murmuró.</p>
+                        <p>Pero ella no respondió.</p>
+                        <p>En su desesperación, la mente de Adapa le susurró una única solución: si él consumía las hierbas sagradas, se volvería inmortal, y quizás, con su nuevo poder, podría traer de vuelta a Ninhursag. Con una urgencia frenética, arrancó las hierbas, las llevó a su boca y masticó con rapidez, sintiendo cómo las hojas se deslizaban por su garganta. Y entonces, el mundo cambió. Su percepción se distorsionó, el aire se volvió denso, los colores se apagaron. El tiempo y el espacio parecían desvanecerse. Todo era irreal. Pero de repente, unas manos lo aferraron, sacudiéndolo con fuerza. Una voz, rota por el llanto, rompió la barrera de su mente. —¡¿Por qué hiciste esto?! — sollozaba Ninhursag, aferrándolo con desesperación.</p>
+                        <p>El impacto de sus palabras atravesó la niebla que consumía su conciencia. El trance se quebró, su visión se aclaró, y la realidad volvió a golpearlo con una fuerza abrumadora. Adapa la vio. Ninhursag estaba viva. El choque fue devastador. Confundido, su cuerpo aún tembloroso por la experiencia, la abrazó con fuerza. —Pensé que te había perdido para siempre... Pero Ninhursag negó con la cabeza, sus ojos llenos de dolor. Nada había sucedido. Él solo había gritado, consumido por el miedo, y luego comido las hierbas él solo.</p>
+                        <p>Fue en ese instante de claridad que Adapa comprendió la verdad: Su desesperación no había sido completamente suya. El ser misterioso había sembrado la idea en su mente, no como una imposición directa, sino como una influencia sutil, una sombra que lo llevó a creer que su única opción era consumir las hierbas. El peso del universo cayó sobre Adapa. Había fallado la prueba de los dioses.</p>
+                        <p>Su decepción fue absoluta. Su mente quedó atrapada en un abismo de arrepentimiento y vergüenza. La tristeza era inevitable. El silencio entre ambos era más pesado que cualquier palabra. Adapa, destruido por la verdad, no podía levantar la mirada. Había fallado. Su cuerpo temblaba, su respiración entrecortada y su alma cargada de arrepentimiento. Ninhursag lo miró. Por primera vez, vio en sus ojos algo desconocido. No era miedo, ni angustia, ni rabia. Era derrota absoluta. Su compañero, aquel que había sido su fortaleza, el equilibrio de todo, estaba roto. Pero no por él. Por algo más grande, algo que los sobrepasaba. Por su destino. Entonces, lo entendió. No había vuelta atrás. Los dioses ya habían visto todo. El castigo era inminente. Enki no los perdonaría. La armonía que habían mantenido por tanto tiempo estaba deshecha.</p>
+                        <p>Sus vidas cambiarían para siempre. Los dones que alguna vez les fueron concedidos, ahora serían arrancados de su existencia. Serían desterrados. Sentirían dolor. Sufrirían. Pagarían con su propia existencia el precio de su elección. Y sin embargo... Ninhursag no dudó. Con un último vistazo a Adapa, con lágrimas desbordando su mirada, corrió hacia el jardín. Sus pies golpeaban la tierra con la fuerza de una decisión inquebrantable. Se arrodilló frente a las hierbas sagradas, su respiración agitada. Las tomó con sus manos temblorosas, sintiendo la vida en ellas, el poder que habría sido capaz de cambiarlo todo. Miró al cielo. Los dioses la observaban. Sabían lo que iba a hacer. Y aún así, no la detuvieron.</p>
+                        <p>Ninhursag cerró los ojos, llevó las hierbas a sus labios y las consumió. No por rebelión. No por desafío. Lo hizo por él. Por Adapa. Por todo lo que habían sido. Y por todo lo que aún debían ser.</p>
+                        <p>Adapa corrió desesperado tras Ninhursag, intentando detenerla. —¡No lo hagas! — gritó, con el alma hecha pedazos. Pero ya era tarde. Con determinación, Ninhursag había probado las hierbas sagradas. En ese instante, el ser misterioso comenzó a transformarse. Su silueta se retorció, sus sombras se expandieron, hasta que tomó la forma de una ave colosal y oscura, con rasgos antropomórficos. Sin emitir sonido, extendió sus inmensas alas y se elevó en el cielo, alejándose hacia el horizonte. Entonces, todo cambió. El ambiente se tornó frío y opresivo, la luz se desvaneció y una inquietante oscuridad envolvió el mundo. Adapa y Ninhursag sintieron un terror profundo, conscientes de las consecuencias de sus actos. Sabían que los dioses habían visto todo. El cielo rugió con estruendosos truenos y relámpagos, iluminando la noche con su ira. Luego, una voz potente y distorsionada quebrantó el silencio del universo. Era Enki. Su tono cargaba decepción y furia. Su creación había fallado. No habían respetado el pacto. Los expulsó de Dilmun, desterrándolos a la Tierra, despojándolos de los dones que les habían otorgado. Ahora conocerían el dolor, el padecimiento y el sufrimiento en la tierra que una vez les perteneció. Pero algo peor había sucedido. Al consumir las hierbas sagradas, habían desatado la necesidad. Hasta entonces, los seres vivían en equilibrio, en plenitud. Pero ahora, sentían hambre, deseo, carencia. La armonía del universo se fracturó, y los animales del mundo crearon jerarquías de poder, donde el más fuerte devoraba al más débil para sobrevivir. La maldición de dos seres se convirtió en la condena de un universo entero.</p>
+                        <p>Adapa y Ninhursag miraron el mundo que los rodeaba, teñido por la sombra de su elección. El cielo rugió con truenos y relámpagos, y la voz de Enki cortó el silencio del universo. —¡EL PACTO ESTA ROTO! . Los dioses los dejaron a su destino inminente, castigándolos no solo con sufrimiento, sino con un propósito cruel. A Adapa, le concedieron y condenaron a 900 años de vida, para que su existencia fuera un recordatorio eterno de su error con su sufrimiento sobre la tierra , una marca imborrable de su elección. A Ninhursag, le otorgaron la super longevidad, pero con una condición: su conocimiento sería fragmentado en clanes humanos, disperso entre generaciones, para que ningún ser pudiera comprender la totalidad del código y permitir que el parásito lo descubriera. Pero el castigo de Ninhursag iba más allá de la super longevidad. Porque cuando los 900 años de Adapa llegaron a su fin, ella permaneció. Lo vio envejecer, lo vio debilitarse, lo vio despedirse. Y cuando Adapa cerró los ojos por última vez, una eternidad de tristeza la envolvió. Por siglos, cargó el peso del recuerdo, la sombra de la ausencia, el dolor de haberlo perdido para siempre. Y, sin embargo, cumplió su propósito. Dio a luz a los clanes más importantes de la humanidad, plantó las semillas de la nueva existencia, esparció su conocimiento como los dioses lo ordenaron. Hasta que su propósito estuvo completo. Solo entonces, con la última fragmentación del conocimiento humano, Ninhursag cerró los ojos y se despidió del mundo. Con su última exhalación, ella también murió. La caída del hombre ante los dioses había comenzado. El fin de Dilmun marcó el inicio de una nueva era. El universo jamás volvería a ser el mismo.</p>
+                        <p>Porque en cada fin… siempre hay un comienzo.</p>
+
+                    </div>
+                </div>
+            </div>`;
+        const characterData = [
+            {
+                id: 'adapa', name: 'Adapa', title: 'El Primer Hombre',
+                description: 'Atormentado por su elección, su destino es un eco de arrepentimiento.',
+                image: 'https://placehold.co/600x800/8B4513/FFFFFF?text=Adapa',
+                consciousness: {'Libre Albedrío': 7, 'Amor': 9, 'Miedo': 8, 'Influencia Externa': 9, 'Conciencia Divina': 4, 'Arrepentimiento': 10},
+                fullDetails: {history: "Adapa fue la primera creación consciente...", relationships: [{ name: "Ninhursag", type: "Compañera, amor eterno" }, { name: "Enki", type: "Creador y Juez" }], keyEvents: ["Creación en Dilmun", "Tentación y Caída", "Exilio y Condena"]}
+            },
+            {
+                id: 'ninhursag', name: 'Ninhursag', title: 'La Madre de la Creación',
+                description: 'Su lealtad inquebrantable la condenó a una eternidad de soledad.',
+                image: 'https://placehold.co/600x800/228B22/FFFFFF?text=Ninhursag',
+                consciousness: {'Libre Albedrío': 9, 'Amor': 10, 'Miedo': 5, 'Influencia Externa': 3, 'Conciencia Divina': 7, 'Arrepentimiento': 2},
+                fullDetails: {history: "Ninhursag, la figura materna...", relationships: [{ name: "Adapa", type: "Compañero, amor eterno" }], keyEvents: ["Rechazar la tentación", "Elegir el exilio por amor", "Fundar los clanes"]}
+            },
+            {
+                id: 'enki', name: 'Enki', title: 'El Dios Creador',
+                description: 'Un dios de orden que desató el caos para preservar el equilibrio.',
+                image: 'https://placehold.co/600x800/00008B/FFFFFF?text=Enki',
+                consciousness: {'Libre Albedrío': 10, 'Amor': 2, 'Miedo': 3, 'Influencia Externa': 1, 'Conciencia Divina': 10, 'Arrepentimiento': 1},
+                fullDetails: {history: "Enki es una de las deidades primordiales...", relationships: [{ name: "Adapa y Ninhursag", type: "Creaciones" }], keyEvents: ["Poner a prueba a la humanidad", "Dictar la sentencia", "Alterar el universo"]}
+            },
+            {
+                id: 'ser_misterioso', name: 'El Ser Misterioso', title: 'La Sombra de la Corrupción',
+                description: 'Una entidad enigmática que teje la discordia en el tejido del destino.',
+                image: 'https://placehold.co/600x800/4B0082/FFFFFF?text=Ser',
+                consciousness: {'Libre Albedrío': 1, 'Amor': 0, 'Miedo': 0, 'Influencia Externa': 10, 'Conciencia Divina': 6, 'Arrepentimiento': 0},
+                fullDetails: {history: "Esta entidad es la encarnación de la plaga...", relationships: [{ name: "Adapa", type: "Víctima de manipulación" }], keyEvents: ["Infiltrarse en Dilmun", "Sembrar la duda y el miedo", "Provocar la caída"]}
+            },
+            {
+                id: 'adamu', name: 'Adamu', title: 'El Soldado del Fin',
+                description: 'Un alma en una era de guerra, luchando contra un eco del pasado.',
+                image: 'https://placehold.co/600x800/A9A9A9/000000?text=Adamu',
+                consciousness: {'Libre Albedrío': 6, 'Amor': 5, 'Miedo': 9, 'Influencia Externa': 7, 'Conciencia Divina': 2, 'Arrepentimiento': 5},
+                fullDetails: {history: "Miles de años después de la Caída, Adamu vive...", relationships: [{ name: "Humanidad", type: "Defensor" }, { name: "Xlerion", type: "Enemigo" }], keyEvents: ["Sobrevivir a la guerra", "Recibir la misión", "Comprender el pasado"]}
+            },
+        ];
+        const timelineData = [
+            { period: "El Principio", title: "Creación y Armonía", description: "Los dioses crean el universo y múltiples formas de vida coexisten en equilibrio.", extendedInfo: "En el alba de los tiempos, los arquitectos cósmicos, conocidos como los Dioses, tejieron la realidad..." },
+            { period: "La Anomalía", title: "Surge la Plaga Parasitaria", description: "Una raza basada en la codicia emerge, corrompiendo y consumiendo mundos.", extendedInfo: "Desde un rincón oscuro e imprevisto del cosmos, surgió una disonancia..." },
+            { period: "La Purga", title: "El Gran Diluvio Universal", description: "Los dioses destruyen los mundos infectados, salvando la esencia de la vida en la Tierra.", extendedInfo: "Ante la amenaza de un colapso universal, los Dioses tomaron una decisión drástica..." },
+            { period: "El Renacer", title: "Adapa y Ninhursag", description: "La primera pareja humana con conciencia y libre albedrío es creada en el paraíso de Dilmun.", extendedInfo: "En la Tierra, la vida volvió a florecer, culminando en la creación de Adapa y Ninhursag..." },
+            { period: "La Caída", title: "El Consumo de las Hierbas Sagradas", description: "Adapa y Ninhursag comen del fruto prohibido, quebrando el pacto con los dioses.", extendedInfo: "La prueba definitiva llegó en la forma de una prohibición y una tentación..." },
+            { period: "El Eco", title: "La Guerra de Adamu", description: "En un futuro distante, la humanidad lucha contra Xlerion, una posible evolución de la plaga original.", extendedInfo: "Eones más tarde, las consecuencias de la Caída resuenan en la era de Adamu..." }
+        ];
+        const worldData = [
+            { 
+                id: 'dilmun', 
+                title: 'Dilmun: El Edén Perdido', 
+                description: 'Un mundo utópico de belleza y armonía perfectas...', 
+                status: 'Destruido o inaccesible. Se ha convertido en un mito.', 
+                image: 'https://placehold.co/600x400/1E90FF/FFFFFF?text=Dilmun',
+                fullContent: `
+                    <div>
+                        <div class="h-96 bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080/1E90FF/000000?text=Banner+de+Dilmun')"></div>
+                        <div class="p-8 md:p-12">
+                            <h2 class="text-5xl font-extrabold text-white">Dilmun: El Edén Perdido</h2>
+                            <p class="mt-6 text-lg text-gray-300 max-w-4xl">
+                                Dilmun era la joya de la creación, un mundo tejido con la esencia misma de la divinidad. Aquí, la realidad operaba bajo un paradigma de armonía absoluta; no existía el conflicto, el envejecimiento ni la decadencia. Cada ser vivo, desde la criatura más pequeña hasta las formas de vida más complejas, coexistía en una perfecta sinfonía. La energía del cosmos fluía libremente a través de sus paisajes, haciendo que la tierra misma vibrara con un poder puro y sereno.
+                            </p>
+                            <div class="my-8 bg-gray-900/50 rounded-lg p-6 border border-gray-700 max-w-4xl">
+                                <h4 class="text-2xl font-bold text-blue-400">Puntos de Interés</h4>
+                                <ul class="mt-4 space-y-4 text-gray-400">
+                                    <li><b>El Jardín Prohibido:</b> No era un simple huerto, sino una zona de pruebas creada por Enki. Las 'hierbas sagradas' que contenía eran una llave directa al poder de la creación, una prueba definitiva de lealtad y autocontrol.</li>
+                                    <li><b>La Montaña Kilima:</b> Un nexo físico entre el plano mortal y el divino. Fue en su cima donde Adapa y Ninhursag, al compartir sus conciencias, dieron a luz al concepto del Amor, una fuerza tan potente que ni los propios dioses habían previsto.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>` 
+            },
+            { 
+                id: 'tierra', 
+                title: 'La Tierra Post-Caída', 
+                description: 'Un reflejo sombrío y fracturado de lo que fue Dilmun...', 
+                status: 'Campo de batalla ancestral para facciones que luchan por el poder.', 
+                image: 'https://placehold.co/600x400/8B4513/FFFFFF?text=Tierra',
+                fullContent: `
+                    <div>
+                        <div class="h-96 bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080/8B4513/FFFFFF?text=Banner+de+la+Tierra')"></div>
+                        <div class="p-8 md:p-12">
+                            <h2 class="text-5xl font-extrabold text-white">La Tierra Post-Caída</h2>
+                            <p class="mt-6 text-lg text-gray-300 max-w-4xl">
+                                Tras el exilio, la Tierra se convirtió en una sombra de Dilmun, un mundo donde la armonía fue reemplazada por la 'Ley de la Necesidad'. La supervivencia se convirtió en el motor principal de la existencia. La belleza aún persiste en sus paisajes salvajes, pero ahora está entrelazada con un peligro constante y una sensación de pérdida irreparable. Es un mundo de una belleza trágrica.
+                            </p>
+                             <div class="my-8 bg-gray-900/50 rounded-lg p-6 border border-gray-700 max-w-4xl">
+                                <h4 class="text-2xl font-bold text-blue-400">Puntos de Interés</h4>
+                                <ul class="mt-4 space-y-4 text-gray-400">
+                                    <li><b>Los Clanes Fragmentados:</b> Para proteger el Código Génesis, Ninhursag lo fragmentó entre sus descendientes. Ahora, la humanidad está dividida en clanes, cada uno con una pieza del rompecabezas genético, lo que los hace objetivos de Xlerion.</li>
+                                    <li><b>Ruinas Antiguas:</b> Lugares donde la energía de la 'Caída' fue tan intensa que dejó cicatrices en la realidad. En estas zonas, las leyes de la física pueden ser inestables y a menudo se encuentran artefactos de un poder incomprensible.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>` 
+            },
+            { 
+                id: 'adamu-era', 
+                title: 'La Era de Adamu: Futuro Distópico', 
+                description: 'La culminación de milenios de decadencia...', 
+                status: 'Al borde del colapso total, con la humanidad a punto de ser "cosechada".', 
+                image: 'https://placehold.co/600x400/A9A9A9/000000?text=Xlerion',
+                fullContent: `
+                    <div>
+                        <div class="h-96 bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080/444444/000000?text=Banner+de+la+Era+de+Adamu')"></div>
+                        <div class="p-8 md:p-12">
+                            <h2 class="text-5xl font-extrabold text-white">La Era de Adamu</h2>
+                            <p class="mt-6 text-lg text-gray-300 max-w-4xl">
+                                El futuro lejano es un testimonio del fracaso de la humanidad para superar su pasado. El planeta es ahora un páramo industrial, una necrópolis de metal y ceniza bajo un cielo perpetuamente gris. La naturaleza ha sido erradicada o corrompida por la maquinaria de Xlerion, una fuerza que representa la evolución final de la Plaga Parasitaria.
+                            </p>
+                             <div class="my-8 bg-gray-900/50 rounded-lg p-6 border border-gray-700 max-w-4xl">
+                                <h4 class="text-2xl font-bold text-blue-400">Puntos de Interés</h4>
+                                <ul class="mt-4 space-y-4 text-gray-400">
+                                    <li><b>Fortalezas Xlerion:</b> Ciudadelas-fábrica monolíticas que perforan la superficie del planeta. Son centros de procesamiento donde los restos de la humanidad son analizados y descompuestos en busca de los fragmentos del Código Génesis.</li>
+                                    <li><b>Los Reductos:</b> Las últimas ciudades humanas, construidas en las profundidades de la tierra o en cañones ocultos. Son lugares claustrofóbicos y desesperados, pero también el último bastión de la voluntad de supervivencia de la humanidad.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>` 
+            }
+        ];
+        const galleryData = [
+            {
+                id: 'sacrificio-ninhursag',
+                title: 'El Sacrificio de Ninhursag',
+                image: 'https://placehold.co/400x400/5a2d7a/FFFFFF?text=Sacrificio',
+                fullContent: `
+                    <div>
+                        <div class="p-4 md:p-8 max-w-5xl mx-auto">
+                            <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">El Sacrificio de Ninhursag</h2>
+                            <img src="https://placehold.co/1200x800/5a2d7a/FFFFFF?text=Arte+Conceptual" alt="Arte conceptual del Sacrificio de Ninhursag" class="rounded-lg w-full h-auto shadow-2xl">
+                            <p class="text-lg text-gray-300 mt-8">
+                                Este arte conceptual captura el momento crucial en que Ninhursag, viendo el tormento y la desesperación de Adapa, toma la decisión de consumir también las hierbas sagradas. No es un acto de rebelión, sino de amor y lealtad incondicional, aceptando compartir el mismo destino que él. La paleta de colores oscuros y la luz enfocada en su figura resaltan la solemnidad y el peso de su elección, un acto que la condenaría a una eternidad de soledad pero que, en su corazón, era la única forma de permanecer unida a él.
+                            </p>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'ser-misterioso',
+                title: 'La Tentación',
+                image: 'https://placehold.co/400x400/004d40/FFFFFF?text=Tentacion',
+                fullContent: `
+                    <div>
+                        <div class="p-4 md:p-8 max-w-5xl mx-auto">
+                            <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">La Tentación del Ser Misterioso</h2>
+                            <img src="https://placehold.co/1200x800/004d40/FFFFFF?text=Arte+Conceptual" alt="Arte conceptual de la Tentación" class="rounded-lg w-full h-auto shadow-2xl">
+                            <p class="text-lg text-gray-300 mt-8">
+                                Aquí se representa al Ser Misterioso en su forma serpentina, susurrando visiones de poder y un amor eterno a un Adapa vulnerable. La composición busca crear una atmósfera de intriga y peligro inminente. La luz que emana de la criatura contrasta con la oscuridad del Jardín Prohibido, simbolizando la naturaleza engañosa de su oferta: una promesa brillante que esconde una verdad corrupta. La postura de Adapa refleja su conflicto interno, atrapado entre la razón y un miedo creciente.
+                            </p>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'guerra-adamu',
+                title: 'La Guerra de Adamu',
+                image: 'https://placehold.co/400x400/8c2a2a/FFFFFF?text=Guerra',
+                fullContent: `
+                    <div>
+                        <div class="p-4 md:p-8 max-w-5xl mx-auto">
+                            <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">La Guerra de Adamu</h2>
+                            <img src="https://placehold.co/1200x800/8c2a2a/FFFFFF?text=Arte+Conceptual" alt="Arte conceptual de la Guerra de Adamu" class="rounded-lg w-full h-auto shadow-2xl">
+                            <p class="text-lg text-gray-300 mt-8">
+                                Una visión del futuro distópico donde Adamu lucha por la supervivencia de la humanidad. El paisaje es una necrópolis industrial dominada por las monolíticas fortalezas de Xlerion. El arte busca transmitir la escala masiva del conflicto y la desesperación de la resistencia humana. Los colores ocres y rojizos, junto con el humo y las cenizas, pintan un mundo al borde de la extinción, donde cada batalla es un eco de la elección que se tomó eones atrás.
+                            </p>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'expulsion-dilmun',
+                title: 'El Exilio de Dilmun',
+                image: 'https://placehold.co/400x400/1e3a8a/FFFFFF?text=Exilio',
+                fullContent: `
+                    <div>
+                        <div class="p-4 md:p-8 max-w-5xl mx-auto">
+                            <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">El Exilio de Dilmun</h2>
+                            <img src="https://placehold.co/1200x800/1e3a8a/FFFFFF?text=Arte+Conceptual" alt="Arte conceptual del Exilio de Dilmun" class="rounded-lg w-full h-auto shadow-2xl">
+                            <p class="text-lg text-gray-300 mt-8">
+                                Esta pieza ilustra el momento en que Adapa y Ninhursag son desterrados de Dilmun. El paraíso perdido queda a sus espaldas, brillante y etéreo, mientras que el camino hacia la Tierra se muestra oscuro e incierto. La ira de Enki se manifiesta en los cielos tormentosos. Las figuras de Adapa y Ninhursag, pequeñas ante la inmensidad del cosmos, transmiten su vulnerabilidad y el peso de su nueva realidad: una vida de sufrimiento y necesidad, pero que enfrentarán juntos.
+                            </p>
+                        </div>
+                    </div>`
+            }
+        ];
+        const systemData = [
+            {
+                id: 'libre-albedrio',
+                title: 'El Libre Albedrío',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18" /></svg>`,
+                description: 'La ley fundamental que otorga a todos los seres la capacidad de forjar su propio destino, pero también la responsabilidad de sus consecuencias.',
+                fullContent: `
+                    <div>
+                        <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                            <h2 class="text-4xl md:text-5xl font-extrabold text-white">El Libre Albedrío</h2>
+                            <p class="mt-6 text-xl text-blue-400">La única ley universal decretada por los dioses.</p>
+                            <p class="mt-6 text-lg text-gray-300">
+                                Tras erradicar la primera plaga parasitaria, los dioses necesitaban una garantía de que sus nuevas creaciones no serían corrompidas. Así nació el Libre Albedrío, inicialmente como un experimento. Observaron cómo Adapa y Ninhursag tomaban decisiones sin intervención divina, y al ver el éxito, lo establecieron como la única y más importante ley del cosmos.
+                            </p>
+                            <p class="mt-4 text-lg text-gray-300">
+                                Esta ley establece que ningún ser puede ser forzado a actuar o pensar de una manera específica. Cada individuo es dueño de sus elecciones, pero esta libertad conlleva una carga inmensa: el destino de todo el universo descansa sobre las decisiones de sus habitantes. Fue esta misma ley la que se puso a prueba en Dilmun, y su violación por parte de Adapa desencadenó la Caída.
+                            </p>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'la-necesidad',
+                title: 'La Necesidad',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>`,
+                description: 'La fractura del equilibrio cósmico. La maldición que introdujo el hambre, el conflicto y la supervivencia del más fuerte en el universo.',
+                fullContent: `
+                    <div>
+                        <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                            <h2 class="text-4xl md:text-5xl font-extrabold text-white">La Necesidad</h2>
+                            <p class="mt-6 text-xl text-red-400">La consecuencia directa de la Caída.</p>
+                            <p class="mt-6 text-lg text-gray-300">
+                                Antes de la elección de Adapa, en Dilmun no existía el hambre, el dolor ni el sufrimiento. Todo funcionaba en una armonía perfecta. Sin embargo, al consumir las hierbas sagradas, Adapa y Ninhursag no solo rompieron el pacto con los dioses, sino que desataron una fuerza entrópica en el universo: la "Necesidad".
+                            </p>
+                            <p class="mt-4 text-lg text-gray-300">
+                                La Necesidad es la carencia, el deseo, el hambre. Es la fuerza que impulsa a los seres a competir y luchar para sobrevivir. La armonía se rompió, y en su lugar se establecieron jerarquías de poder donde el más fuerte devora al más débil. La maldición de dos seres se convirtió en la condena de un universo entero, un eco perpetuo de su error que define la existencia de todas las generaciones futuras.
+                            </p>
+                        </div>
+                    </div>`
+            }
+        ];
+        const footerLinksData = [
+            {
+                id: 'cookies',
+                text: 'Aviso sobre cookies',
+                fullContent: `
+                    <div>
+                        <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                            <h2 class="text-3xl md:text-4xl font-extrabold text-white">Aviso sobre Cookies</h2>
+                            <p class="mt-6 text-lg text-gray-300">
+                                Este sitio web utiliza cookies y tecnologías similares para mejorar la experiencia del usuario, analizar el tráfico y para fines de personalización y medición de anuncios. Una cookie es un pequeño archivo de texto que se almacena en su dispositivo. Al continuar utilizando nuestro sitio, usted acepta nuestro uso de cookies.
+                            </p>
+                            <h3 class="text-2xl font-bold text-white mt-8">Tipos de Cookies que Utilizamos</h3>
+                            <ul class="list-disc list-inside mt-4 space-y-2 text-gray-400">
+                                <li><strong>Cookies Esenciales:</strong> Necesarias para el funcionamiento básico del sitio, como mantener la sesión.</li>
+                                <li><strong>Cookies de Rendimiento y Análisis:</strong> Recopilan información anónima sobre cómo los usuarios interactúan con nuestro sitio para ayudarnos a mejorarlo.</li>
+                                <li><strong>Cookies de Funcionalidad:</strong> Recuerdan las elecciones que usted hace (como el idioma) para mejorar su experiencia.</li>
+                            </ul>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'terms',
+                text: 'Términos de uso',
+                fullContent: `
+                    <div>
+                        <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                            <h2 class="text-3xl md:text-4xl font-extrabold text-white">Términos de Uso</h2>
+                            <p class="mt-6 text-lg text-gray-300">
+                                Al acceder y utilizar este sitio web, usted acepta y se compromete a cumplir con los siguientes términos y condiciones de uso. Todo el contenido presentado en este sitio, incluyendo textos, gráficos, logos e imágenes, es propiedad de Mike Hellawaits y está protegido por las leyes de derechos de autor.
+                            </p>
+                            <p class="mt-4 text-lg text-gray-300">
+                                El uso de este sitio es para fines informativos y de entretenimiento personal. Queda prohibida la reproducción, distribución o modificación no autorizada de cualquier contenido sin el permiso explícito del propietario.
+                            </p>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'privacy',
+                text: 'Aviso de privacidad',
+                fullContent: `
+                    <div>
+                        <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                            <h2 class="text-3xl md:text-4xl font-extrabold text-white">Aviso de Privacidad</h2>
+                            <p class="mt-6 text-lg text-gray-300">
+                                Nos tomamos muy en serio su privacidad. Este aviso describe qué datos personales recopilamos y cómo los utilizamos. La única información que podemos recopilar es a través de formularios de contacto o suscripción al boletín, y solo se utilizará para los fines indicados.
+                            </p>
+                            <p class="mt-4 text-lg text-gray-300">
+                                No compartiremos su información personal con terceros sin su consentimiento, excepto cuando sea requerido por la ley.
+                            </p>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'support',
+                text: 'Centro de soporte',
+                fullContent: `
+                    <div>
+                        <div class="p-8 md:p-12 max-w-4xl mx-auto">
+                            <h2 class="text-3xl md:text-4xl font-extrabold text-white">Centro de Soporte</h2>
+                            <p class="mt-6 text-lg text-gray-300">
+                                Si tiene alguna pregunta sobre el universo de Xlerion's Total Darkness, problemas técnicos con el sitio web o consultas de prensa, puede ponerse en contacto con nosotros a través del siguiente correo electrónico de contacto (ficticio): <a href="mailto:soporte@xlerion.com" class="text-blue-400 hover:underline">soporte@xlerion.com</a>.
+                            </p>
+                        </div>
+                    </div>`
+            }
+        ];
+        // --- FIN DE LA ZONA EDITABLE ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inicializar Particles.js
+            particlesJS("particles-js", {"particles":{"number":{"value":50,"density":{"enable":true,"value_area":800}},"color":{"value":"#00A9FF"},"shape":{"type":"circle"},"opacity":{"value":0.5,"random":true},"size":{"value":3,"random":true},"line_linked":{"enable":false},"move":{"enable":true,"speed":1,"direction":"none","random":true,"straight":false,"out_mode":"out","bounce":false}},"interactivity":{"detect_on":"canvas","events":{"onhover":{"enable":false},"onclick":{"enable":false},"resize":true}},"retina_detect":true});
+
+            // Lógica de la Galería del Hero
+            const heroImagesContainer = document.getElementById('hero-images-container');
+            let currentImageIndex = 0;
+            headerImages.forEach((src, index) => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'hero-bg';
+                if (index === 0) img.classList.add('active');
+                heroImagesContainer.appendChild(img);
+            });
+            const images = heroImagesContainer.querySelectorAll('img');
+            setInterval(() => {
+                images[currentImageIndex].classList.remove('active');
+                currentImageIndex = (currentImageIndex + 1) % images.length;
+                images[currentImageIndex].classList.add('active');
+            }, 5000);
+
+            // Lógica de Modals y Páginas de Detalle
+            const mainContent = document.getElementById('main-content');
+            const detailPageContainer = document.getElementById('detail-page-container');
+            const storySummaryContainer = document.getElementById('story-summary-container');
+            
+            const showDetailPage = (content) => {
+                mainContent.style.opacity = '0';
+                mainContent.style.transform = 'translateY(-20px)';
+                mainContent.style.pointerEvents = 'none';
+                
+                const page = document.createElement('div');
+                page.className = 'detail-page';
+                page.innerHTML = `
+                    <button class="back-button fixed top-4 right-4 md:top-8 md:right-8 bg-white/20 backdrop-blur-md text-white font-bold py-2 px-4 rounded-lg z-20 hover:bg-white/30 transition-colors">&larr; Volver</button>
+                    <div class="relative z-10">
+                        ${content}
+                    </div>`;
+                detailPageContainer.appendChild(page);
+
+                setTimeout(() => page.classList.add('active'), 10);
+
+                page.querySelector('.back-button').addEventListener('click', () => {
+                    hideDetailPage(page);
+                });
+            };
+
+            const hideDetailPage = (page) => {
+                page.classList.remove('active');
+                mainContent.style.opacity = '1';
+                mainContent.style.transform = 'translateY(0)';
+                mainContent.style.pointerEvents = 'auto';
+                setTimeout(() => page.remove(), 500);
+            };
+
+            storySummaryContainer.addEventListener('click', () => {
+                showDetailPage(storyPageContent);
+            });
+            
+            // Generar Tarjetas de Personajes
+            const charactersGrid = document.getElementById('characters-grid');
+            characterData.forEach(char => {
+                const card = document.createElement('div');
+                card.className = 'character-card';
+                card.onclick = () => {
+                    const characterPageContent = `
+                        <div>
+                            <div class="h-96 bg-cover bg-center" style="background-image: url('${char.image.replace('600x800', '1920x1080')}')"></div>
+                            <div class="p-8 md:p-12">
+                                <div class="flex flex-col md:flex-row gap-8">
+                                    <div class="flex-1">
+                                        <h2 class="text-5xl font-extrabold text-white">${char.name}</h2>
+                                        <p class="text-2xl text-blue-400 font-semibold">${char.title}</p>
+                                        <p class="text-gray-300 mt-6 text-lg">${char.fullDetails.history}</p>
+                                        <h4 class="text-3xl font-bold text-white mt-8 mb-4">Relaciones</h4>
+                                        <ul class="space-y-2 text-lg">${char.fullDetails.relationships.map(rel => `<li class="text-gray-400"><span class="font-semibold text-gray-200">${rel.name}:</span> ${rel.type}</li>`).join('')}</ul>
+                                        <h4 class="text-3xl font-bold text-white mt-8 mb-4">Eventos Clave</h4>
+                                        <ul class="space-y-2 list-disc list-inside text-lg">${char.fullDetails.keyEvents.map(event => `<li class="text-gray-400">${event}</li>`).join('')}</ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    showDetailPage(characterPageContent);
+                };
+                card.innerHTML = `
+                    <img src="${char.image}" alt="Imagen de ${char.name}" class="w-full h-full object-cover">
+                    <div class="overlay">
+                        <h3 class="text-3xl font-extrabold text-white">${char.name}</h3>
+                        <p class="text-gray-300">${char.description}</p>
+                    </div>`;
+                charactersGrid.appendChild(card);
+            });
+
+            // Generar Gráfico Radar
+            const radarCtx = document.getElementById('consciousnessRadarChart').getContext('2d');
+            new Chart(radarCtx, {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(characterData[0].consciousness),
+                    datasets: characterData.map((char, index) => {
+                        const colors = ['#00A9FF', '#22C55E', '#EF4444', '#A855F7', '#F97316'];
+                        return {
+                            label: char.name, data: Object.values(char.consciousness),
+                            backgroundColor: 'transparent',
+                            borderColor: colors[index % colors.length],
+                            borderWidth: 2,
+                            pointBackgroundColor: colors[index % colors.length],
+                            pointBorderColor: '#fff', pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: colors[index % colors.length]
+                        };
+                    })
+                },
+                options: {
+                    scales: {r: {
+                        angleLines: { color: 'rgba(255, 255, 255, 0.2)' },
+                        grid: { color: 'rgba(255, 255, 255, 0.2)' },
+                        pointLabels: {color: '#E5E7EB', font: {size: 14}},
+                        ticks: {color: '#E5E7EB', backdropColor: 'rgba(0,0,0,0.5)', stepSize: 2, beginAtZero: true, max: 10}
+                    }},
+                    plugins: {legend: {labels: {color: '#E5E7EB', font: {size: 16}}}}
+                }
+            });
+
+            // Generar Línea de Tiempo
+            const timelineContainer = document.getElementById('timeline-container');
+            timelineData.forEach(event => {
+                const item = document.createElement('div');
+                item.className = 'timeline-item-new';
+                item.innerHTML = `
+                    <div class="timeline-header">
+                        <div class="timeline-dot-new"></div>
+                        <div>
+                            <p class="text-sm text-blue-400 font-semibold uppercase tracking-wider">${event.period}</p>
+                            <h4 class="text-2xl font-bold text-white mt-1">${event.title}</h4>
+                            <p class="text-gray-400 mt-2">${event.description}</p>
+                        </div>
+                    </div>
+                    <div class="timeline-details">
+                        <p class="text-gray-300">${event.extendedInfo}</p>
+                    </div>`;
+                
+                item.querySelector('.timeline-header').addEventListener('click', () => {
+                    const currentlyExpanded = document.querySelector('.timeline-item-new.expanded');
+                    if (currentlyExpanded && currentlyExpanded !== item) {
+                        currentlyExpanded.classList.remove('expanded');
+                    }
+                    item.classList.toggle('expanded');
+                });
+
+                timelineContainer.appendChild(item);
+            });
+
+            // Generar Tarjetas del Mundo
+            const worldCardsContainer = document.getElementById('world-cards-container');
+            worldData.forEach(world => {
+                const card = document.createElement('div');
+                card.className = 'info-card interactive md:flex';
+                card.innerHTML = `
+                    <div class="w-full md:w-1/3 h-48 md:h-auto bg-cover bg-center" style="background-image: url('${world.image}')">
+                        <div class="w-full h-full flex items-center justify-center bg-black/50">
+                             <h3 class="text-4xl font-extrabold text-white">${world.title.split(':')[0]}</h3>
+                        </div>
+                    </div>
+                    <div class="p-8 md:w-2/3">
+                        <h3 class="text-3xl font-bold text-white">${world.title}</h3>
+                        <p class="mt-4 text-gray-300">${world.description}</p>
+                        <p class="mt-2 text-gray-400"><span class="font-bold text-white">Estado Actual:</span> ${world.status}</p>
+                    </div>`;
+                card.addEventListener('click', () => showDetailPage(world.fullContent));
+                worldCardsContainer.appendChild(card);
+            });
+            
+            // Generar Galería
+            const galleryGrid = document.getElementById('gallery-grid');
+            galleryData.forEach(item => {
+                const galleryItem = document.createElement('div');
+                galleryItem.className = 'gallery-item';
+                galleryItem.style.backgroundImage = `url('${item.image}')`;
+                galleryItem.setAttribute('aria-label', item.title);
+                galleryItem.addEventListener('click', () => showDetailPage(item.fullContent));
+                galleryGrid.appendChild(galleryItem);
+            });
+
+            // Generar Tarjetas de Sistema
+            const systemCardsContainer = document.getElementById('system-cards-container');
+            systemData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'info-card interactive p-8 text-center';
+                card.innerHTML = `
+                    <div class="flex justify-center mb-4">${item.icon}</div>
+                    <h3 class="text-2xl font-bold text-white">${item.title}</h3>
+                    <p class="mt-2 text-gray-400">${item.description}</p>
+                `;
+                card.addEventListener('click', () => showDetailPage(item.fullContent));
+                systemCardsContainer.appendChild(card);
+            });
+
+            // Generar Enlaces del Footer
+            const footerLinksContainer = document.getElementById('footer-links-container');
+            footerLinksData.forEach(link => {
+                const linkElement = document.createElement('a');
+                linkElement.href = '#';
+                linkElement.className = 'hover:text-white cursor-pointer';
+                linkElement.textContent = link.text;
+                linkElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showDetailPage(link.fullContent);
+                });
+                footerLinksContainer.appendChild(linkElement);
+            });
+
+            // Lógica del menú móvil
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+        });
+    </script>
+</body>
+</html>
