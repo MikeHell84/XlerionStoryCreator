@@ -650,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>¿Tienes preguntas, sugerencias o simplemente quieres saludar? ¡Nos encantaría saber de ti! Puedes encontrarnos en nuestras redes sociales:</p>
                 <ul>
                     <li><strong>Twitter:</strong> <a href="https://twitter.com/XlerionUltimate" target="_blank" rel="noopener noreferrer">@XlerionUltimate</a></li>
-                    <li><strong>LinkedIn:</strong> <a href="https://www.linkedin.com/company/xlerion" target="_blank" rel="noopener noreferrer">Xlerion en LinkedIn</a></li>
+                    <li><strong>LinkedIn:</strong> <a href="https://www.linkedin.com/in/miguelrodriguez-dataviz/" target="_blank" rel="noopener noreferrer">Miguel Rodríguez en LinkedIn</a></li>
                     <li><strong>Patreon:</strong> <a href="https://www.patreon.com/c/xlerion" target="_blank" rel="noopener noreferrer">Apóyanos en Patreon</a></li>
                 </ul>
                 <p>Para asuntos más formales, puedes contactarnos a través de nuestro correo electrónico: <a href="mailto:contactus@xlerion.com">contactus@xlerion.com</a>.</p>
