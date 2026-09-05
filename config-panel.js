@@ -393,7 +393,17 @@
           ['Inter', 'system-ui', 'Georgia, serif', '"Courier New", monospace'].map(f =>
             '<option value="' + esc(f) + '"' + (s.theme.font === f ? ' selected' : '') + '>' + esc(f) + '</option>').join('') +
         '</select></div>' +
-        '<button id="cfg-reset-theme" class="btn btn-secondary text-sm mt-2"><i class="fas fa-undo mr-2"></i>Restablecer solo diseño</button>') +
+        '<button id="cfg-reset-theme" class="btn btn-secondary text-sm mt-2"><i class="fas fa-undo mr-2"></i>Restablecer solo diseño</button>' +
+        '<div class="p-4 bg-gray-900/50 rounded-lg border border-gray-700 mt-4">' +
+          '<h5 class="font-semibold mb-1">Icono y favicon del sitio</h5>' +
+          '<p class="text-xs text-gray-500 mb-3">Sube un PNG/JPG cuadrado (mín. 256×256, máx. 5 MB). Se regeneran favicon.ico, iconos PWA y apple-touch. Salen en la próxima publicación a GitHub.</p>' +
+          '<div class="flex items-center gap-4 flex-wrap">' +
+            '<img id="cfg-icon-preview" src="icons/favicon-32x32.png" alt="Icono actual" class="w-12 h-12 rounded-lg border border-gray-600 bg-black">' +
+            '<label class="btn btn-secondary text-sm cursor-pointer"><i class="fas fa-upload mr-2"></i>Elegir imagen<input type="file" id="cfg-icon-file" accept="image/png,image/jpeg,image/webp" class="hidden"></label>' +
+            '<button id="cfg-icon-upload" class="btn btn-primary text-sm"><i class="fas fa-icons mr-2"></i>Subir y generar</button>' +
+          '</div>' +
+          '<p id="cfg-icon-status" class="text-xs text-gray-400 mt-2"></p>' +
+        '</div>') +
 
       sectionCard('Inteligencia artificial', 'fa-robot',
         checkRow('cfg-ai-enabled', 'Activar generación con IA', s.ai.enabled, 'Si se desactiva, se ocultan todos los botones de generación.') +
@@ -424,7 +434,7 @@
         '<p class="text-xs text-gray-500 mt-3">Los proyectos se siguen respaldando con Exportar a JSON desde la barra lateral.</p>') +
 
       sectionCard('Publicación en GitHub Pages', 'fa-rocket',
-        '<p class="text-sm text-gray-400 mb-3">Publica <code>data.json</code> y <code>theme.json</code> en tu repositorio. GitHub Pages reconstruye la página pública en 1-3 minutos. El token vive solo en el servidor (.env) y nunca se expone al navegador.</p>' +
+        '<p class="text-sm text-gray-400 mb-3">Sincroniza el <strong>sitio completo</strong> (páginas, código, datos, diseño e iconos) con tu repositorio. GitHub Pages reconstruye en 1-3 minutos. El token vive solo en el servidor (.env) y nunca se expone al navegador. Nunca se suben secretos (.env, config.php, ajustes, backups).</p>' +
         '<p class="text-sm text-gray-400 mb-3">El archivo <code>Xlerion-Total-Darkness.html</code> debe existir una vez en el repo (súbelo con git); aquí solo se actualizan los datos y el diseño.</p>' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
         textRow('cfg-gh-repo', 'Repositorio (propietario/repo)', s.github.repo, 'Ej: miguelxlerion/TotalDarkness') +
@@ -457,6 +467,44 @@
     });
     document.getElementById('cfg-gh-test').onclick = ghTest;
     document.getElementById('cfg-gh-publish').onclick = ghPublish;
+    const iconFile = document.getElementById('cfg-icon-file');
+    const iconStatus = document.getElementById('cfg-icon-status');
+    if (iconFile) {
+      iconFile.onchange = () => {
+        const f = iconFile.files[0];
+        if (f && iconStatus) iconStatus.textContent = 'Seleccionado: ' + f.name;
+        const prev = document.getElementById('cfg-icon-preview');
+        if (f && prev) prev.src = URL.createObjectURL(f);
+      };
+    }
+    const iconBtn = document.getElementById('cfg-icon-upload');
+    if (iconBtn) {
+      iconBtn.onclick = async () => {
+        const f = iconFile && iconFile.files[0];
+        if (!f) { toast('Elige primero una imagen.', true); return; }
+        iconBtn.disabled = true;
+        if (iconStatus) iconStatus.textContent = 'Subiendo y generando iconos...';
+        try {
+          const fd = new FormData();
+          fd.append('icon', f);
+          const res = await fetch('icon.php', { method: 'POST', body: fd });
+          const r = await res.json();
+          if (r.success) {
+            if (iconStatus) iconStatus.textContent = '✓ ' + r.message + ' (' + (r.files || []).length + ' archivos).';
+            const prev = document.getElementById('cfg-icon-preview');
+            if (prev) prev.src = 'icons/favicon-32x32.png?v=' + Date.now();
+            toast('Iconos actualizados.');
+          } else {
+            if (iconStatus) iconStatus.textContent = '✗ ' + (r.message || 'Error.');
+            toast('No se pudo generar: ' + (r.message || 'error'), true);
+          }
+        } catch (e) {
+          if (iconStatus) iconStatus.textContent = '✗ Error de red: ' + e.message;
+        } finally {
+          iconBtn.disabled = false;
+        }
+      };
+    }
     document.getElementById('cfg-gh-token-save').onclick = ghSaveToken;
     renderGhTokenState(null);
     renderGhLast();
