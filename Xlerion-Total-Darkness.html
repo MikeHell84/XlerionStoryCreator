@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mi Historia</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Iconos y fuentes -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+
+    <!-- Librerías para el Mapa Mental -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+
+    <!-- Librería para IndexedDB (necesaria para la vista pública dinámica) -->
+    <script src="https://cdn.jsdelivr.net/npm/idb/build/umd.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #E5E7EB; }
+        .content-card { background-color: #1F2937; border: 1px solid #374151; }
+        .prose-custom { color: #D1D5DB; }
+        .slider-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+        }
+        .slider-image.active { opacity: 1; }
+        .prose-custom h1, .prose-custom h2, .prose-custom h3 { color: #F9FAFB; }
+        .prose-custom a { color: #60A5FA; }
+
+        /* Estilos para el slider de comentarios */
+        .comment-slide {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.7s ease-in-out;
+        }
+        .comment-slide.active { opacity: 1; }
+
+        /* Estilos para Header y Footer profesional */
+        .site-header { background-color: #1F2937; border-bottom: 1px solid #374151; }
+        .site-footer { background-color: #111827; border-top: 1px solid #374151; }
+        .nav-link { transition: color 0.2s; }
+        .nav-link:hover { color: #60A5FA; }
+        body { display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* Estilos para la calificación con estrellas */
+        .rating-stars {
+            cursor: pointer;
+            color: #4b5563; /* Color de estrella vacía */
+            font-size: 1.75rem; /* Tamaño de las estrellas */
+        }
+        .rating-stars .star:hover,
+        .rating-stars .star.filled {
+            color: #f59e0b; /* Color de estrella llena o al pasar el ratón */
+        }
+        .rating-average { font-size: 0.875rem; color: #9ca3af; margin-left: 0.75rem; }
+        .rating-stars.rated {
+            cursor: default;
+            opacity: 0.7;
+        }
+        .rating-stars.rated .star { pointer-events: none; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header Profesional -->
+    <header class="site-header sticky top-0 z-40 shadow-md">
+        <div class="container mx-auto flex justify-between items-center p-4">
+            <a href="#" id="logo-link" class="flex items-center gap-3 cursor-pointer">
+                <img src="favicon.ico" alt="Logo" class="h-8 w-8">
+                <span class="text-xl font-bold text-white">Xlerion´s Total Darkness</span>
+            </a>
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex items-center gap-6">
+                    <a href="#" id="nav-projects-link" class="nav-link text-gray-300 font-semibold">Proyectos</a>
+                    <a href="#" id="nav-about-link" class="nav-link text-gray-300">Acerca de</a>
+                    <a href="#" id="nav-contact-link" class="nav-link text-gray-300">Contacto</a>
+                </nav>
+                <!-- NUEVO: Sección de sesión de usuario -->
+                <div id="user-session" class="text-sm text-white">
+                    <div class="logged-out">
+                        <button id="login-btn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-lg text-xs sm:text-sm">Iniciar Sesión</button>
+                    </div>
+                    <div class="logged-in hidden flex items-center gap-2 sm:gap-4">
+                        <span id="user-email-span" class="font-semibold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none"></span>
+                        <button id="logout-btn" class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-xs sm:text-sm">Salir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="loading" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-indigo-400"></i>
+            <p class="mt-4 text-lg">Cargando historia...</p>
+        </div>
+    </div>
+
+    <!-- NUEVO: Pantalla de selección de proyectos -->
+    <div id="projectSelectionScreen" class="container mx-auto p-4 md:p-8 text-center hidden flex-grow">
+        <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-white mb-4">XLERION´S SAGA</h1>
+        
+        <!-- NUEVO: Image Slider -->
+        <div id="image-slider-container" class="relative w-full max-w-4xl mx-auto h-64 md:h-80 mb-12 rounded-lg overflow-hidden bg-gray-800 shadow-lg hidden">
+            <div id="image-slider" class="relative w-full h-full">
+                <!-- Las imágenes del slider se insertarán aquí por JS -->
+            </div>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+        </div>
+
+        <!-- NUEVO: Slider de Comentarios Aleatorios -->
+        <div id="comment-slider-container" class="w-full max-w-4xl mx-auto mb-12 hidden">
+            <div class="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-gray-700/50">
+                <h3 class="text-lg font-semibold text-indigo-300 mb-3 text-left"><i class="fas fa-comments mr-2"></i>Comentarios de la Comunidad</h3>
+                <div id="comment-slider" class="relative h-24 flex items-center">
+                    <!-- El comentario se insertará aquí por JS -->
+                </div>
+            </div>
+        </div>
+
+        <div id="publicProjectList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <!-- Las tarjetas de proyecto se insertarán aquí por JS -->
+        </div>
+    </div>
+
+    <main id="storyContent" class="container mx-auto p-4 md:p-8 max-w-5xl hidden flex-grow">
+        <!-- Portada y Título -->
+        <header class="mb-12">
+            <button id="backToProjectsBtn" class="mb-8 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i> Volver a la lista
+            </button>
+            <div class="text-center">
+            <img id="projectCover" src="" alt="Portada del Proyecto" class="w-full max-w-2xl mx-auto h-auto object-cover rounded-lg shadow-2xl mb-6 hidden">
+                <h1 id="projectTitle" class="text-4xl md:text-6xl font-bold tracking-tight text-white"></h1>
+            </div>
+        </header>
+
+        <!-- Sinopsis -->
+        <section id="projectSummaryContainer" class="mb-12 prose prose-custom lg:prose-xl max-w-none hidden">
+            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2">Sinopsis</h2>
+            <p id="projectSummary" class="mt-4 text-lg leading-relaxed"></p>
+        </section>
+
+        <!-- Capítulos -->
+        <section id="chaptersContainer" class="mb-12 hidden">
+            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Capítulos</h2>
+            <div id="chaptersList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Los capítulos se insertarán aquí -->
+            </div>
+        </section>
+
+        <!-- Personajes -->
+        <section id="charactersContainer" class="mb-12 hidden">
+            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Personajes</h2>
+            <div id="charactersList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Las tarjetas de personajes se insertarán aquí -->
+            </div>
+        </section>
+
+        <!-- Lugares -->
+        <section id="placesContainer" class="mb-12 hidden">
+            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Lugares</h2>
+            <div id="placesList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Las tarjetas de lugares se insertarán aquí -->
+            </div>
+        </section>
+
+        <!-- Objetos -->
+        <section id="objectsContainer" class="mb-12 hidden">
+            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Objetos Clave</h2>
+            <div id="objectsList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Las tarjetas de objetos se insertarán aquí -->
+            </div>
+        </section>
+
+        <!-- Mapa Mental -->
+        <section id="mindMapSection" class="mb-12 hidden">
+            <h2 class="text-3xl font-semibold border-b border-gray-700 pb-2 mb-6">Mapa Mental de la Trama</h2>
+            <div id="publicMindMapContainer" class="w-full h-[60vh] border border-gray-700 rounded-lg bg-gray-800"></div>
+        </section>
+    </main>
+
+    <!-- Modal de Inicio de Sesión -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm m-4">
+            <h2 class="text-2xl font-bold text-white mb-4">Iniciar Sesión / Registrarse</h2>
+            <p class="text-gray-400 mb-6">Ingresa tu correo para calificar y comentar. No se necesita contraseña.</p>
+            <form id="loginForm">
+                <input type="email" id="emailInput" placeholder="tu-correo@ejemplo.com" required class="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <p id="loginError" class="text-red-400 text-sm mt-2 hidden"></p>
+                <button type="submit" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg">Ingresar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Detalles (Modificado para incluir calificaciones y comentarios) -->
+    <div id="publicDetailsModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-40 hidden p-4">
+        <div class="bg-gray-900 text-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative border border-gray-700" id="publicDetailsModalContent">
+            <header class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="publicDetailsTitle" class="text-3xl font-bold text-indigo-400"></h3>
+                <button id="publicCloseDetailsModal" title="Cerrar ventana" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </header>
+            <main id="publicDetailsBody" class="p-6 overflow-y-auto flex-grow">
+                <!-- El contenido del ítem se insertará aquí -->
+            </main>
+            <!-- NUEVA SECCIÓN DE CALIFICACIONES Y COMENTARIOS -->
+            <section id="interaction-section" class="p-6 border-t border-gray-700 bg-gray-800/50 overflow-y-auto flex-shrink-0" style="max-height: 45vh;">
+                <!-- Calificaciones -->
+                <div id="detailsRatingContainer" class="mb-6">
+                    <h4 class="font-bold text-lg mb-2 text-indigo-400">Calificaciones</h4>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <div id="average-stars" class="text-2xl flex gap-1 text-gray-600"><!-- Estrellas de promedio se insertan aquí --></div>
+                            <span class="rating-value text-gray-400 font-semibold"></span>
+                        </div>
+                        <div id="user-rating-section" class="hidden flex items-center gap-2">
+                            <p class="text-sm text-gray-300">Tu calificación:</p>
+                            <div id="user-stars" class="text-2xl flex gap-1 text-gray-500" data-item-id="">
+                                <!-- Estrellas para el usuario se insertarán aquí -->
+                            </div>
+                            <p id="user-rated-message" class="text-xs text-gray-400 ml-2 hidden"></p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Comentarios -->
+                <div id="detailsCommentsContainer">
+                    <h4 class="font-bold text-lg mb-4 text-indigo-400">Comentarios</h4>
+                    <form id="commentForm" class="hidden mb-6">
+                        <textarea id="comment-textarea" placeholder="Escribe tu comentario..." required class="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg float-right">Comentar</button>
+                    </form>
+                    <ul id="commentsList" class="space-y-4 clear-both">
+                        <!-- Los comentarios se insertarán aquí -->
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Static Content Modal -->
+    <div id="staticContentModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
+                <h3 id="staticContentTitle" class="text-2xl font-bold text-white"></h3>
+                <button id="btnCloseStaticContent" title="Cerrar ventana" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="staticContentBody" class="p-6 overflow-y-auto prose prose-custom lg:prose-xl max-w-none">
+                <!-- El contenido estático se inyectará aquí -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Profesional -->
+    <footer class="site-footer mt-auto pt-12 pb-8 px-4">
+        <div class="container mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-gray-400">
+            <!-- Columna del Logo -->
+            <div class="space-y-4">
+                <a href="#" id="footer-logo-link" class="flex items-center gap-3 cursor-pointer">
+                    <img src="favicon.ico" alt="Logo" class="h-8 w-8">
+                    <span class="text-lg font-bold text-white">Xlerion Story Creator</span>
+                </a>
+                <p class="text-sm">Tu plataforma para crear y compartir mundos e historias interactivas.</p>
+            </div>
+            <!-- Columna de Navegación -->
+            <div>
+                <h4 class="font-semibold text-white mb-4">Navegación</h4>
+                <ul class="space-y-2">
+                    <li><a href="#" id="footer-projects-link" class="nav-link">Proyectos</a></li>
+                    <li><a href="#" id="footer-about-link" class="nav-link">Acerca de</a></li>
+                    <li><a href="#" id="footer-contact-link" class="nav-link">Contacto</a></li>
+                </ul>
+            </div>
+            <!-- Columna Legal -->
+            <div>
+                <h4 class="font-semibold text-white mb-4">Legal</h4>
+                <ul class="space-y-2">
+                    <li><a href="#" id="footer-terms-link" class="nav-link">Términos de Servicio</a></li>
+                    <li><a href="#" id="footer-privacy-link" class="nav-link">Política de Privacidad</a></li>
+                </ul>
+            </div>
+            <!-- Columna de Redes Sociales -->
+            <div>
+                <h4 class="font-semibold text-white mb-4">Síguenos</h4>
+                <div class="flex space-x-4 text-2xl">
+                    <a href="https://twitter.com/XlerionUltimate" target="_blank" rel="noopener noreferrer" class="nav-link" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="https://www.linkedin.com/company/xlerion" target="_blank" rel="noopener noreferrer" class="nav-link" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                    <a href="https://www.patreon.com/c/xlerion" target="_blank" rel="noopener noreferrer" class="nav-link" aria-label="Patreon"><i class="fab fa-patreon"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="mt-12 border-t border-gray-700 pt-8 text-center text-sm">
+            <p>&copy; <span id="footer-year"></span> Xlerion. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+    
+    <!-- El script historia.js ahora cargará los datos desde data.json si existe, o usará los datos inyectados. -->
+    <!-- historia.js ahora leerá desde data.js en lugar de una base de datos -->
+    <script src="historia.js"></script>
+    <script src="enhancements.js" defer></script>
+</body>
+</html>
