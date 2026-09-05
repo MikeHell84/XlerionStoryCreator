@@ -216,25 +216,38 @@ if (!$token) {
     send(false, 'Sin token configurado en el servidor. Configura GITHUB_TOKEN primero.', ['setup' => $setupSteps], 200);
 }
 
-// Sitio completo: datos + diseño + visor público. Así GitHub Pages
-// muestra la página sin necesidad de subir nada a mano.
-$wanted = [
-    'data.json' => ['local' => __DIR__ . '/data.json', 'required' => true],
-    'theme.json' => ['local' => __DIR__ . '/theme.json', 'required' => false],
-    'Xlerion-Total-Darkness.html' => ['local' => __DIR__ . '/Xlerion-Total-Darkness.html', 'required' => true],
-    'historia.js' => ['local' => __DIR__ . '/historia.js', 'required' => true],
-    'enhancements.js' => ['local' => __DIR__ . '/enhancements.js', 'required' => false],
-    'favicon.ico' => ['local' => __DIR__ . '/favicon.ico', 'required' => false],
-    'icons/icon-192x192.png' => ['local' => __DIR__ . '/icons/icon-192x192.png', 'required' => false],
-    'icons/icon-512x512.png' => ['local' => __DIR__ . '/icons/icon-512x512.png', 'required' => false],
-];
+// Sincronización del sitio COMPLETO: se recorre el directorio y se sube
+// todo menos la lista de exclusión (secretos, cachés, utilidades locales).
+// Así ningún cambio se queda sin publicar.
+$denyDirs = ['.git', 'backups', 'node_modules', '.vscode', '.idea'];
+$denyFiles = ['.env', 'config.php', 'settings.json'];
+$denyExt = ['tmp', 'log'];
+$denyNames = ['Thumbs.db', '.DS_Store', 'launch.ps1', 'launcher.bat', 'convert.js'];
 $files = [];
-foreach ($wanted as $repoPath => $info) {
-    if (file_exists($info['local'])) {
-        $files[$repoPath] = $info['local'];
-    } elseif ($info['required']) {
-        send(false, "No existe {$repoPath} en el servidor. Usa primero \"Publicar (Web)\".", [], 400);
+$skippedBig = [];
+$base = __DIR__;
+$it = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::LEAVES_ONLY
+);
+foreach ($it as $file) {
+    if (!$file->isFile()) continue;
+    $rel = str_replace('\\', '/', substr($file->getPathname(), strlen($base) + 1));
+    $parts = explode('/', $rel);
+    $skip = false;
+    foreach ($parts as $seg) {
+        if (in_array($seg, $denyDirs, true)) { $skip = true; break; }
     }
+    if ($skip) continue;
+    $name = end($parts);
+    if (in_array($name, $denyFiles, true) || in_array($name, $denyNames, true)) continue;
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    if (in_array($ext, $denyExt, true)) continue;
+    if ($file->getSize() > 25 * 1024 * 1024) { $skippedBig[] = $rel; continue; }
+    $files[$rel] = $file->getPathname();
+}
+if (!isset($files['data.json'])) {
+    send(false, 'No existe data.json en el servidor. Usa primero "Publicar (Web)".', [], 400);
 }
 if (empty($files)) {
     send(false, 'No hay archivos para publicar.', [], 400);
@@ -294,8 +307,9 @@ if ($chk['code'] === 404) {
     $pagesNote = 'Sitio: ' . $chk['data']['html_url'] . 'Xlerion-Total-Darkness.html';
 }
 
-send(true, 'Publicado en GitHub. Pages se actualizará en 1-3 minutos.', [
+send(true, 'Publicado en GitHub (' . count($published) . ' archivos). Pages se actualizará en 1-3 minutos.', [
     'files' => $published,
+    'omitted_large' => $skippedBig,
     'commit_url' => $commitUrl,
     'deployed_at' => time(),
     'pages_note' => $pagesNote,
