@@ -513,18 +513,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // Obtener el item actual para acceder a sus calificaciones y comentarios locales.
         const item = findItemById(itemId);
         if (!item) return;
-    
+
+        // Normaliza ambos formatos históricos: número suelto (legado) u objeto {userEmail, rating}.
+        const ratingValue = (r) => (typeof r === 'number' ? r : (r && r.rating)) || 0;
+
         // --- Calificaciones --- (Ahora lee de la data local que viene de data.json)
         let userRating = 0;
         if (currentUser) {
-            const userRatingObj = item.ratings?.find(r => r.userEmail === currentUser);
+            const userRatingObj = item.ratings?.find(r => r && r.userEmail === currentUser);
             if (userRatingObj) {
-                userRating = userRatingObj.rating;
+                userRating = ratingValue(userRatingObj);
             }
         }
 
         const itemRatings = item.ratings || [];
-        const averageRating = itemRatings.length > 0 ? (itemRatings.reduce((sum, r) => sum + r.rating, 0) / itemRatings.length) : 0;
+        const averageRating = itemRatings.length > 0 ? (itemRatings.reduce((sum, r) => sum + ratingValue(r), 0) / itemRatings.length) : 0;
         
         const ratingStarsContainer = document.getElementById('average-stars');
         if (ratingStarsContainer) {
@@ -600,13 +603,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filteredComments.length > 0) {
             filteredComments.forEach(comment => {
                 // Buscar si este usuario también calificó el ítem
-                const userRatingForThisCommenter = item.ratings?.find(r => r.userEmail === comment.userEmail);
+                const userRatingForThisCommenter = item.ratings?.find(r => r && r.userEmail === comment.userEmail);
                 let ratingDisplayHtml = '';
 
                 if (userRatingForThisCommenter) {
+                    const commenterRating = ratingValue(userRatingForThisCommenter);
                     let starsHtml = '';
                     for (let i = 1; i <= 5; i++) {
-                        starsHtml += `<i class="fas fa-star text-xs ${i <= userRatingForThisCommenter.rating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
+                        starsHtml += `<i class="fas fa-star text-xs ${i <= commenterRating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
                     }
                     // Contenedor para las estrellas con un pequeño margen
                     ratingDisplayHtml = `<div class="flex-shrink-0 ml-4">${starsHtml}</div>`;
