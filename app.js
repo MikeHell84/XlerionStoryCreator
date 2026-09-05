@@ -21,11 +21,127 @@ const firebaseConfig = {
     appId: "TU_APP_ID"
 };
 
-// Inicializar Firebase
-const firebaseApp = initializeApp(firebaseConfig);
-const auth = getAuth(firebaseApp);
+// --- ACCESO LOCAL DE ADMINISTRADOR (cuando Firebase no está configurado) ---
+// Firebase sigue siendo el método principal en cuanto completes firebaseConfig.
+// Mientras tanto, este acceso local permite entrar al panel sin romper nada.
+const LOCAL_ADMIN = {
+    email: "admin@xlerion.local",
+    // SHA-256 de la contraseña (nunca se guarda en texto plano en el código).
+    passHash: "c5fd500f041296259d30d8dd265bb9aded7457c7da93c3f511f43db705c3074b"
+};
+const LOCAL_SESSION_KEY = 'xlerion-local-admin';
+
+const isFirebaseConfigured = firebaseConfig.apiKey !== "TU_API_KEY"
+    && !String(firebaseConfig.apiKey || '').startsWith("TU_");
+
+// Inicializar Firebase solo si está configurado
+let firebaseApp = null;
+let auth = null;
+if (isFirebaseConfigured) {
+    try {
+        firebaseApp = initializeApp(firebaseConfig);
+        auth = getAuth(firebaseApp);
+    } catch (e) {
+        console.error('No se pudo inicializar Firebase, se usará acceso local.', e);
+        auth = null;
+    }
+}
+
+// SHA-256 en hexadecimal (WebCrypto con fallback puro-JS por si no hay secure context)
+async function sha256Hex(text) {
+    try {
+        if (window.crypto && window.crypto.subtle) {
+            const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+    } catch (e) { /* usar fallback */ }
+    return sha256Fallback(text);
+}
+function sha256Fallback(ascii) {
+    function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+    const mathPow = Math.pow, maxWord = mathPow(2, 32);
+    let result = '';
+    const words = [];
+    const asciiBitLength = unescape(encodeURIComponent(ascii)).length * 8;
+    let hash = sha256Fallback.h = sha256Fallback.h || [];
+    const k = sha256Fallback.k = sha256Fallback.k || [];
+    let primeCounter = k.length;
+    const isComposite = {};
+    for (let candidate = 2; primeCounter < 64; candidate++) {
+        if (!isComposite[candidate]) {
+            for (let i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+            hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+            k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+        }
+    }
+    const bytes = unescape(encodeURIComponent(ascii));
+    ascii += '\x80';
+    while (ascii.length % 64 - 56) ascii += '\x00';
+    for (let i = 0; i < ascii.length; i++) {
+        const j = ascii.charCodeAt(i);
+        if (j >> 8) return '';
+        words[i >> 2] |= j << ((3 - i) % 4) * 8;
+    }
+    words[words.length] = (asciiBitLength / maxWord) | 0;
+    words[words.length] = asciiBitLength;
+    for (let j = 0; j < words.length;) {
+        const w = words.slice(j, j += 16);
+        const oldHash = hash;
+        hash = hash.slice(0, 8);
+        for (let i = 0; i < 64; i++) {
+            const w15 = w[i - 15], w2 = w[i - 2];
+            const a = hash[0], e = hash[4];
+            const temp1 = hash[7]
+                + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+                + ((e & hash[5]) ^ ((~e) & hash[6]))
+                + k[i]
+                + (w[i] = (i < 16) ? w[i] : (w[i - 16]
+                    + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3))
+                    + w[i - 7]
+                    + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) | 0);
+            const temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+                + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+            hash = [(temp1 + temp2) | 0].concat(hash);
+            hash[4] = (hash[4] + temp1) | 0;
+        }
+        for (let i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+    }
+    for (let i = 0; i < 8; i++) {
+        for (let j = 3; j + 1; j--) {
+            const b = (hash[i] >> (j * 8)) & 255;
+            result += ((b < 16) ? '0' : '') + b.toString(16);
+        }
+    }
+    return result;
+}
+
+function enterLocalAdmin() {
+    const loginScreen = document.getElementById('login-screen');
+    const appContainer = document.getElementById('app-container');
+    const errorMessage = document.getElementById('login-error-message');
+    console.log('Administrador local autenticado.');
+    if (loginScreen) loginScreen.classList.add('hidden');
+    if (appContainer) appContainer.classList.remove('hidden');
+    if (errorMessage) errorMessage.classList.add('hidden');
+}
+
+async function handleLocalLogin() {
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const errorMessage = document.getElementById('login-error-message');
+    const email = (emailInput.value || '').trim().toLowerCase();
+    const hash = await sha256Hex(passwordInput.value || '');
+    if (email === LOCAL_ADMIN.email && hash === LOCAL_ADMIN.passHash) {
+        try { sessionStorage.setItem(LOCAL_SESSION_KEY, '1'); } catch (e) {}
+        enterLocalAdmin();
+    } else {
+        errorMessage.textContent = 'Credenciales incorrectas.';
+        errorMessage.classList.remove('hidden');
+    }
+}
 
 // --- GESTIÓN DE SESIÓN ---
+if (auth) {
 onAuthStateChanged(auth, (user) => {
     const loginScreen = document.getElementById('login-screen');
     const appContainer = document.getElementById('app-container');
@@ -59,6 +175,7 @@ onAuthStateChanged(auth, (user) => {
         appContainer.classList.add('hidden');
     }
 });
+} // fin if (auth) — en modo local la sesión la gestiona handleLocalLogin
 
 function getFirebaseErrorMessage(errorCode) {
     switch (errorCode) {
@@ -74,6 +191,11 @@ function getFirebaseErrorMessage(errorCode) {
 
 async function handleLogin(event) {
     event.preventDefault();
+    // Sin Firebase configurado se usa el acceso local de administrador.
+    if (!isFirebaseConfigured || !auth) {
+        await handleLocalLogin();
+        return;
+    }
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const errorMessage = document.getElementById('login-error-message');
@@ -120,8 +242,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) { // La función signOut de Firebase es la que cierra la sesión
-        logoutButton.addEventListener('click', () => signOut(auth));
+    if (logoutButton) {
+        logoutButton.addEventListener('click', async () => {
+            try { sessionStorage.removeItem(LOCAL_SESSION_KEY); } catch (e) {}
+            if (auth) {
+                // La función signOut de Firebase es la que cierra la sesión
+                try { await signOut(auth); } catch (e) { console.error(e); }
+            } else {
+                // Modo local: volver a la pantalla de login manualmente
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('app-container').classList.add('hidden');
+            }
+        });
+    }
+
+    // Modo local: restaurar sesión y mostrar aviso discreto
+    if (!isFirebaseConfigured || !auth) {
+        try {
+            if (sessionStorage.getItem(LOCAL_SESSION_KEY) === '1') {
+                enterLocalAdmin();
+            }
+        } catch (e) {}
+        const loginForm = document.getElementById('login-form');
+        if (loginForm && !document.getElementById('local-mode-note')) {
+            const note = document.createElement('p');
+            note.id = 'local-mode-note';
+            note.className = 'text-gray-500 text-xs text-center';
+            note.textContent = 'Modo local: accede con tu cuenta de administrador.';
+            loginForm.appendChild(note);
+        }
     }
 
     const registerButton = document.getElementById('register-button');
@@ -141,6 +290,7 @@ let appState = {
   projects: [],
   currentProjectIndex: null,
   currentTab: 'dashboard',
+  settings: null, // Configuración global del CMS (pestaña Config)
   modalType: null, // tipo de ítem (chapters, characters, places, objects)
   modalItemIndex: null, // índice del ítem a editar
   mindMapNetwork: null,   // Instancia del mapa mental
@@ -359,8 +509,474 @@ async function saveProjects() {
     alert("Error al guardar el proyecto. El almacenamiento podría estar lleno o corrupto. Error: " + error.message);
   }
 }
+
+// ============================================================
+// --- CONFIGURACIÓN GLOBAL DEL CMS (pestaña Config) ---
+// Ajustes de sitio: general + diseño + IAs. Se guardan en el
+// mismo store de IndexedDB con la clave 'appSettings', sin
+// necesidad de migrar el esquema de la base de datos.
+// ============================================================
+// Catálogo de proveedores de IA gratuitos por tarea.
+// method GET: el prompt va en la URL (plantilla con {prompt}).
+// method POST: se envía JSON {inputs: prompt} (estilo Hugging Face).
+const AI_PROVIDERS = {
+  pollinations: { label: 'Pollinations.ai', detail: 'Gratis · sin clave', method: 'GET', endpoint: 'https://image.pollinations.ai/prompt/{prompt}', needsKey: false, needsModel: false },
+  sdworker: { label: 'Stable Diffusion (worker)', detail: 'Gratis · sin clave', method: 'GET', endpoint: 'https://incredibly-fast-image-processing.workers.dev/generate?prompt={prompt}', needsKey: false, needsModel: false },
+  huggingface: { label: 'Hugging Face Inference', detail: 'Gratis con API key', method: 'POST', endpoint: 'https://api-inference.huggingface.co/models/{model}', needsKey: true, needsModel: true, defaultModel: 'stabilityai/stable-diffusion-xl-base-1.0' },
+  customget: { label: 'Personalizado (GET)', detail: 'Tu propio endpoint', method: 'GET', endpoint: '', needsKey: false, needsModel: false, custom: true },
+  custompost: { label: 'Personalizado (POST JSON)', detail: 'Tu propio endpoint', method: 'POST', endpoint: '', needsKey: false, needsModel: false, custom: true }
+};
+const AI_TASKS = {
+  cover: 'Portadas del proyecto',
+  image: 'Imágenes de capítulos, personajes y objetos',
+  map: 'Mapas de lugares'
+};
+function defaultTaskProvider() {
+  return { provider: 'pollinations', key: '', model: '', endpoint: '', params: '' };
+}
+
+const DEFAULT_SETTINGS = {
+  version: 2,
+  general: { siteName: 'Xlerion Story Creator', featuredCount: 6, galleryCount: 8 },
+  github: { repo: 'miguelxlerion/XlerionStoryCreator', branch: 'main', lastDeploy: null },
+  updatedAt: 0, // Última modificación de los ajustes (para sincronizar entre puertos/dispositivos)
+  theme: {
+    accent: '#6366f1', accentHover: '#4338ca',
+    bg: '#121212', surface: '#1A1A1A', surface2: '#242424',
+    text: '#E0E0E0', muted: '#9ca3af', font: 'Inter',
+    btnText: '#ffffff', btnSecondaryText: '#E0E0E0'
+  },
+  ai: {
+    enabled: true,
+    providers: {
+      cover: { provider: 'pollinations', key: '', model: '', endpoint: '', params: '' },
+      image: { provider: 'pollinations', key: '', model: '', endpoint: '', params: '' },
+      map: { provider: 'pollinations', key: '', model: '', endpoint: '', params: '' }
+    },
+    globalSuffix: '',
+    randomVariation: true,
+    coverWords: 40, itemWords: 15, mapWords: 8,
+    styles: {
+      image: [
+        { id: 'default', label: 'Por Defecto (Fantasía)', prompt: 'dark fantasy, epic digital art', enabled: true },
+        { id: 'futuristic', label: 'Futurista / Sci-Fi', prompt: 'futuristic, sci-fi, cyberpunk, neon lights, advanced technology, cinematic', enabled: true },
+        { id: 'modern', label: 'Moderno / Realista', prompt: 'modern, realistic, 4k photo, contemporary, cinematic lighting', enabled: true },
+        { id: 'vintage', label: 'Vintage / Pasado', prompt: 'vintage, old photo, retro style, sepia tones, film grain', enabled: true },
+        { id: 'dynamic', label: 'Dinámico / Acción', prompt: 'dynamic action shot, motion blur, cinematic, intense', enabled: true },
+        { id: 'surreal', label: 'Surrealista / Abstracto', prompt: 'surreal, abstract, dreamlike, bizarre, imaginative', enabled: true },
+        { id: 'minimalist', label: 'Minimalista', prompt: 'minimalist, clean, simple, vector art, plain background', enabled: true },
+        { id: 'biological', label: 'Biológico / Orgánico', prompt: 'biological, organic, cellular structures, microscopic view, anatomical, vibrant, detailed', enabled: true },
+        { id: 'chemical', label: 'Químico / Abstracto', prompt: 'chemical reaction, abstract, molecular, flowing liquids, vibrant colors, scientific illustration', enabled: true },
+        { id: 'steampunk', label: 'Steampunk', prompt: 'steampunk, gears, cogs, brass, victorian, intricate machinery, detailed', enabled: true },
+        { id: 'blueprint', label: 'Plano / Blueprint', prompt: 'blueprint schematic, technical drawing, grid lines, clean, architectural plan', enabled: true }
+      ],
+      cover: [
+        { id: 'default', label: 'Por Defecto (Fantasía)', prompt: 'dark fantasy, epic book cover, cinematic digital art, high detail, trending on artstation', enabled: true },
+        { id: 'futuristic', label: 'Futurista / Sci-Fi', prompt: 'sci-fi book cover, futuristic, cyberpunk, neon lights, advanced technology, cinematic', enabled: true },
+        { id: 'modern', label: 'Moderno / Realista', prompt: 'modern thriller book cover, realistic, 4k photo, contemporary, cinematic lighting', enabled: true },
+        { id: 'vintage', label: 'Vintage / Pasado', prompt: 'vintage book cover, old photo, retro style, sepia tones, film grain', enabled: true },
+        { id: 'surreal', label: 'Surrealista / Abstracto', prompt: 'surrealist book cover, abstract, dreamlike, bizarre, imaginative', enabled: true },
+        { id: 'minimalist', label: 'Minimalista', prompt: 'minimalist book cover, clean, simple, vector art, plain background', enabled: true },
+        { id: 'steampunk', label: 'Steampunk', prompt: 'steampunk book cover, gears, cogs, brass, victorian, intricate machinery', enabled: true },
+        { id: 'blueprint', label: 'Plano / Blueprint', prompt: 'technical blueprint book cover, schematic, grid lines, clean, architectural plan', enabled: true }
+      ],
+      map: [
+        { id: 'satellite', label: 'Satélite Realista', prompt: 'realistic top-down satellite view, high-resolution, no text labels, epic', enabled: true },
+        { id: 'fantasy', label: 'Fantasía (Dibujado a mano)', prompt: 'fantasy map, hand-drawn style, detailed, cartography, Tolkien style, no text', enabled: true },
+        { id: 'blueprint', label: 'Plano / Blueprint', prompt: 'blueprint schematic, technical drawing, grid lines, clean, architectural plan', enabled: true },
+        { id: 'ancient', label: 'Pergamino Antiguo', prompt: 'ancient parchment map, old paper texture, compass rose, sea monsters, sepia tones', enabled: true },
+        { id: 'cyberpunk', label: 'Cyberpunk / Neón', prompt: 'cyberpunk city map, neon grid, holographic, futuristic, glowing lines', enabled: true }
+      ]
+    }
+  }
+};
+
+function cloneSettings(s) {
+  return JSON.parse(JSON.stringify(s));
+}
+
+function mergeStyleLists(defaultList, savedList) {
+  const savedById = {};
+  (Array.isArray(savedList) ? savedList : []).forEach(st => {
+    if (st && st.id) savedById[st.id] = st;
+  });
+  const merged = defaultList.map(d => {
+    const s = savedById[d.id] || {};
+    return {
+      id: d.id,
+      label: typeof s.label === 'string' && s.label ? s.label : d.label,
+      prompt: typeof s.prompt === 'string' && s.prompt ? s.prompt : d.prompt,
+      enabled: typeof s.enabled === 'boolean' ? s.enabled : true
+    };
+  });
+  // Conservar estilos personalizados que no existan en los defaults
+  Object.keys(savedById).forEach(id => {
+    if (!merged.some(m => m.id === id)) {
+      const s = savedById[id];
+      merged.push({ id, label: String(s.label || id), prompt: String(s.prompt || ''), enabled: s.enabled !== false });
+    }
+  });
+  return merged;
+}
+
+function mergeSettings(saved) {
+  const d = DEFAULT_SETTINGS;
+  const s = (saved && typeof saved === 'object') ? saved : {};
+  const out = cloneSettings(d);
+  if (typeof s.updatedAt === 'number' && s.updatedAt > 0) out.updatedAt = s.updatedAt;
+  if (s.general && typeof s.general === 'object') {
+    if (typeof s.general.siteName === 'string' && s.general.siteName.trim()) out.general.siteName = s.general.siteName.slice(0, 80);
+    out.general.featuredCount = Math.min(12, Math.max(1, parseInt(s.general.featuredCount, 10) || d.general.featuredCount));
+    out.general.galleryCount = Math.min(16, Math.max(1, parseInt(s.general.galleryCount, 10) || d.general.galleryCount));
+  }
+  if (s.theme && typeof s.theme === 'object') {
+    ['accent', 'accentHover', 'bg', 'surface', 'surface2', 'text', 'muted', 'btnText', 'btnSecondaryText'].forEach(k => {
+      if (typeof s.theme[k] === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.theme[k])) out.theme[k] = s.theme[k];
+    });
+    if (typeof s.theme.font === 'string' && s.theme.font) out.theme.font = s.theme.font.slice(0, 60);
+  }
+  if (s.github && typeof s.github === 'object') {
+    if (typeof s.github.repo === 'string' && /^[\w.-]+\/[\w.-]+$/.test(s.github.repo.trim())) {
+      let repo = s.github.repo.trim().slice(0, 120);
+      // Migración: el destino anterior era otro repo; actualizar al actual una sola vez
+      if (repo === 'miguelxlerion/TotalDarkness') repo = 'miguelxlerion/XlerionStoryCreator';
+      out.github.repo = repo;
+    }
+    if (typeof s.github.branch === 'string' && /^[\w./-]+$/.test(s.github.branch.trim())) {
+      out.github.branch = s.github.branch.trim().slice(0, 80);
+    }
+    if (typeof s.github.lastDeploy === 'number') out.github.lastDeploy = s.github.lastDeploy;
+  }
+  const cleanStr = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+  const cleanProviderTask = (t) => {
+    const p = (t && typeof t === 'object') ? t : {};
+    const ids = Object.keys(AI_PROVIDERS);
+    return {
+      provider: ids.includes(p.provider) ? p.provider : 'pollinations',
+      key: cleanStr(p.key, 300),
+      model: cleanStr(p.model, 200),
+      endpoint: cleanStr(p.endpoint, 500),
+      params: cleanStr(p.params, 500)
+    };
+  };
+  if (s.ai && typeof s.ai === 'object') {
+    const a = s.ai, o = out.ai;
+    if (typeof a.enabled === 'boolean') o.enabled = a.enabled;
+    // Migración desde esquema v1 (defaultService + endpoints globales)
+    let legacyProvider = null;
+    if (a.defaultService === 'stablediffusion') legacyProvider = 'sdworker';
+    else if (a.defaultService === 'pollinations') legacyProvider = 'pollinations';
+    let legacyCustomGet = '';
+    if (typeof a.pollinationsEndpoint === 'string' && a.pollinationsEndpoint.includes('{prompt}') &&
+        a.pollinationsEndpoint !== AI_PROVIDERS.pollinations.endpoint) {
+      legacyCustomGet = a.pollinationsEndpoint.slice(0, 500);
+    }
+    if (a.providers && typeof a.providers === 'object') {
+      ['cover', 'image', 'map'].forEach(task => {
+        o.providers[task] = cleanProviderTask(a.providers[task]);
+      });
+    } else {
+      ['cover', 'image', 'map'].forEach(task => {
+        o.providers[task] = defaultTaskProvider();
+        if (legacyProvider) o.providers[task].provider = legacyProvider;
+        if (legacyCustomGet) {
+          o.providers[task].provider = 'customget';
+          o.providers[task].endpoint = legacyCustomGet;
+          if (typeof a.pollinationsParams === 'string') o.providers[task].params = a.pollinationsParams.slice(0, 500);
+        }
+      });
+    }
+    if (typeof a.globalSuffix === 'string') o.globalSuffix = a.globalSuffix.slice(0, 500);
+    if (typeof a.randomVariation === 'boolean') o.randomVariation = a.randomVariation;
+    ['coverWords', 'itemWords', 'mapWords'].forEach(k => {
+      const v = parseInt(a[k], 10);
+      if (v >= 5 && v <= 200) o[k] = v;
+    });
+    if (a.styles && typeof a.styles === 'object') {
+      ['image', 'cover', 'map'].forEach(kind => {
+        o.styles[kind] = mergeStyleLists(d.ai.styles[kind], a.styles[kind]);
+      });
+    }
+  }
+  return out;
+}
+
+async function loadSettings() {
+  appState.settings = cloneSettings(DEFAULT_SETTINGS);
+  if (!db) return;
+  try {
+    const saved = await db.get('projects', 'appSettings');
+    if (saved) appState.settings = mergeSettings(saved);
+  } catch (e) {
+    console.warn('No se pudieron cargar los ajustes, se usan los valores por defecto.', e);
+  }
+  applySettings();
+}
+
+async function saveSettings() {
+  appState.settings.updatedAt = Date.now();
+  if (!db) return;
+  try {
+    await db.put('projects', appState.settings, 'appSettings');
+  } catch (e) {
+    console.error('No se pudieron guardar los ajustes.', e);
+    alert('Error al guardar la configuración: ' + e.message);
+  }
+  applySettings();
+  // Respaldo en el servidor (best-effort): así los ajustes y las API keys
+  // sobreviven a cambios de puerto (cada puerto es un origen distinto),
+  // a otros navegadores y a reinstalaciones. Silencioso para no romper
+  // el uso sin servidor (file://) ni en estático puro.
+  try {
+    await fetch('settings.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: appState.settings })
+    });
+  } catch (e) { /* sin servidor: solo local */ }
+}
+
+// Trae los ajustes del servidor y se queda con los más recientes
+// (comparando updatedAt). Llamado una vez al arrancar.
+async function syncSettingsFromServer() {
+  let server = null;
+  try {
+    const res = await fetch('settings.php?action=get', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.settings && typeof data.settings === 'object') server = data.settings;
+  } catch (e) { return; }
+  if (!server) return;
+  const merged = mergeSettings(server);
+  const localTs = appState.settings.updatedAt || 0;
+  const serverTs = merged.updatedAt || 0;
+  if (serverTs > localTs) {
+    appState.settings = merged;
+    try { await db.put('projects', appState.settings, 'appSettings'); } catch (e) {}
+    applySettings();
+  }
+}
+
+function resetSettings() {
+  appState.settings = cloneSettings(DEFAULT_SETTINGS);
+}
+
+function getSettings() {
+  if (!appState.settings) appState.settings = cloneSettings(DEFAULT_SETTINGS);
+  return appState.settings;
+}
+
+// --- Aplicación de ajustes ---
+function applySettings() {
+  applyTheme();
+  applyGeneralSettings();
+  populateStyleSelects();
+  populateProviderSelects();
+  applyAISettingsToUI();
+}
+
+// Reconstruye los desplegables de proveedor IA desde el catálogo.
+function populateProviderSelects() {
+  const ai = getSettings().ai;
+  const fill = (el, task) => {
+    if (!el) return;
+    const prev = el.value || (ai.providers[task] || {}).provider || 'pollinations';
+    el.innerHTML = '';
+    Object.keys(AI_PROVIDERS).forEach(id => {
+      const p = AI_PROVIDERS[id];
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = p.label + ' (' + p.detail + ')';
+      el.appendChild(opt);
+    });
+    el.value = AI_PROVIDERS[prev] ? prev : 'pollinations';
+  };
+  fill(dom.coverImageService, 'cover');
+  fill(dom.inputImageService, 'image');
+  fill(dom.inputMapService, 'map');
+}
+
+function applyTheme() {
+  const t = getSettings().theme;
+  let styleEl = document.getElementById('xlerion-theme');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'xlerion-theme';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent =
+    ':root{--x-accent:' + t.accent + ';--x-accent-hover:' + t.accentHover + ';--x-bg:' + t.bg +
+    ';--x-surface:' + t.surface + ';--x-surface2:' + t.surface2 + ';--x-text:' + t.text +
+    ';--x-muted:' + t.muted + ';--x-font:' + t.font + ';}' +
+    'body{background:' + t.bg + '!important;color:' + t.text + '!important;font-family:' + t.font + ',Inter,sans-serif!important;}' +
+    '.sidebar{background:' + t.surface + '!important;}' +
+    '#sidebar h1{color:' + t.accent + '!important;}' +
+    '.card{background:' + t.surface + '!important;}' +
+    '.modal{background:' + t.surface + '!important;}' +
+    '.btn-primary{background:' + t.accent + '!important;color:' + t.btnText + '!important;}' +
+    '.btn-primary:hover{background:' + t.accentHover + '!important;}' +
+    '.btn-secondary{background:' + t.surface2 + '!important;color:' + t.btnSecondaryText + '!important;}' +
+    '.tab-button.active{color:' + t.accent + '!important;border-bottom:2px solid ' + t.accent + '!important;}' +
+    'input[type=text],input[type=password],input[type=number],input[type=file],input[type=color],textarea,select{border-color:' + t.surface2 + '!important;}' +
+    'input[type=text]:focus,input[type=password]:focus,input[type=number]:focus,textarea:focus,select:focus{border-color:' + t.accent + '!important;}' +
+    'input[type=color]{background:' + t.surface2 + '!important;}';
+}
+
+function applyGeneralSettings() {
+  const g = getSettings().general;
+  const title = (g.siteName || '').trim() || DEFAULT_SETTINGS.general.siteName;
+  document.title = title;
+  const sidebarTitle = document.querySelector('#sidebar h1');
+  if (sidebarTitle) sidebarTitle.textContent = title;
+}
+
+function getEnabledStyles(kind) {
+  const list = getSettings().ai.styles[kind] || [];
+  const enabled = list.filter(s => s.enabled);
+  return enabled.length ? enabled : list;
+}
+
+function getStylePrompt(kind, id) {
+  const list = getSettings().ai.styles[kind] || [];
+  const found = list.find(s => s.id === id && s.enabled !== false) || list.find(s => s.enabled !== false) || list[0];
+  return found ? found.prompt : '';
+}
+
+function populateStyleSelects() {
+  const fill = (el, kind, keepValue) => {
+    if (!el) return;
+    const prev = keepValue ? el.value : null;
+    el.innerHTML = '';
+    getEnabledStyles(kind).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.label;
+      el.appendChild(opt);
+    });
+    if (prev && Array.from(el.options).some(o => o.value === prev)) el.value = prev;
+  };
+  fill(dom.coverImageStyle, 'cover', true);
+  fill(dom.inputImageStyle, 'image', true);
+  fill(dom.inputMapStyle, 'map', true);
+}
+
+// Resuelve la configuración efectiva de un proveedor para una tarea:
+// catálogo + ajustes por tarea (clave, modelo, endpoint/params personalizados).
+function getTaskProvider(task, serviceId) {
+  const ai = getSettings().ai;
+  const cfg = (ai.providers && ai.providers[task]) ? ai.providers[task] : defaultTaskProvider();
+  const id = (serviceId && AI_PROVIDERS[serviceId]) ? serviceId : (cfg.provider || 'pollinations');
+  const def = AI_PROVIDERS[id] || AI_PROVIDERS.pollinations;
+  const endpoint = (def.custom && cfg.endpoint) ? cfg.endpoint : def.endpoint;
+  const model = cfg.model || def.defaultModel || '';
+  return { id, def, key: cfg.key || '', model, endpoint, params: cfg.params || '' };
+}
+
+function buildProviderUrl(resolved, prompt) {
+  let url = resolved.endpoint.includes('{prompt}') ? resolved.endpoint : resolved.endpoint + '{prompt}';
+  url = url.replace('{prompt}', encodeURIComponent(prompt));
+  url = url.replace('{model}', encodeURIComponent(resolved.model));
+  const extra = (resolved.params || '').trim().replace(/^[?&]+/, '');
+  if (extra) url += (url.includes('?') ? '&' : '?') + extra;
+  return url;
+}
+
+// Descarga la imagen generada como Blob (GET o POST según el proveedor).
+async function fetchAiImageBlob(serviceId, task, prompt) {
+  const r = getTaskProvider(task, serviceId);
+  if (!r.endpoint) throw new Error('El proveedor "' + r.def.label + '" no tiene endpoint configurado.');
+  if (r.def.needsKey && !r.key) throw new Error('El proveedor "' + r.def.label + '" requiere API key (configúrala en Config → IA).');
+
+  if (r.def.method === 'POST') {
+    const url = r.endpoint.replace('{model}', encodeURIComponent(r.model)).replace('{prompt}', encodeURIComponent(prompt));
+    const headers = { 'Content-Type': 'application/json' };
+    if (r.key) headers['Authorization'] = 'Bearer ' + r.key;
+    const body = { inputs: prompt };
+    if (r.params) {
+      try {
+        const extra = JSON.parse('{' + r.params.replace(/^[{\s]+|[}\s]+$/g, '') + '}');
+        if (extra && typeof extra === 'object') body.parameters = extra;
+      } catch (e) { /* params POST opcionales en formato clave: valor */ }
+    }
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    const ct = res.headers.get('content-type') || '';
+    if (!res.ok) {
+      let detail = res.statusText;
+      try { const j = await res.json(); detail = j.error || j.message || JSON.stringify(j).slice(0, 200); } catch (e) {}
+      throw new Error('La API devolvió error ' + res.status + ': ' + detail);
+    }
+    if (ct.includes('application/json')) {
+      const j = await res.json();
+      throw new Error('La API no devolvió imagen: ' + JSON.stringify(j).slice(0, 200));
+    }
+    return await res.blob();
+  }
+
+  const response = await fetch(buildProviderUrl(r, prompt), { cache: 'no-store' });
+  if (!response.ok) throw new Error('La API de generación devolvió un error: ' + response.statusText);
+  return await response.blob();
+}
+
+const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.readAsDataURL(blob);
+  reader.onloadend = () => resolve(reader.result);
+  reader.onerror = reject;
+});
+
+async function aiImageToBase64(serviceId, task, prompt) {
+  return await blobToBase64(await fetchAiImageBlob(serviceId, task, prompt));
+}
+
+function aiVariationSuffix(prefix) {
+  if (!getSettings().ai.randomVariation) return '';
+  if (prefix === 'seed') return ' seed: ' + Math.random();
+  return ', variation ' + Math.random().toString(36).substring(7);
+}
+
+function aiGlobalSuffix() {
+  const s = (getSettings().ai.globalSuffix || '').trim();
+  return s ? ', ' + s : '';
+}
+
+function applyAISettingsToUI() {
+  const ai = getSettings().ai;
+  const show = !!ai.enabled;
+  const toggle = (el, visible) => { if (el) el.classList.toggle('hidden', !visible); };
+  // Botones principales de generación
+  toggle(dom.btnGenerateImage, show);
+  toggle(dom.btnGenerateMap, show);
+  if (dom.btnOpenCoverGenerator) dom.btnOpenCoverGenerator.style.display = show ? '' : 'none';
+  // Campos de servicio/estilo (solo si el modal genérico existe en el DOM)
+  toggle(dom.imageServiceField, show);
+  toggle(dom.imageStyleField, show);
+  toggle(dom.mapServiceField, show);
+  toggle(dom.mapStyleField, show);
+  // Proveedor por defecto de cada tarea
+  const taskDefault = (task) => (ai.providers && ai.providers[task] && ai.providers[task].provider) || 'pollinations';
+  const setSvc = (el, task) => {
+    if (el && AI_PROVIDERS[taskDefault(task)]) el.value = taskDefault(task);
+  };
+  setSvc(dom.inputImageService, 'image');
+  setSvc(dom.inputMapService, 'map');
+  setSvc(dom.coverImageService, 'cover');
+}
+
+// API pública para el panel de configuración (config-panel.js)
+window.xlerionConfig = {
+  getSettings, saveSettings, resetSettings, applySettings,
+  defaults: () => cloneSettings(DEFAULT_SETTINGS),
+  importSettings: (obj) => { appState.settings = mergeSettings(obj); },
+  providers: () => AI_PROVIDERS,
+  tasks: () => AI_TASKS,
+  resolveProvider: (task, serviceId) => getTaskProvider(task, serviceId),
+  generateTest: (serviceId, task, prompt) => aiImageToBase64(serviceId, task, prompt),
+  publishAll: () => publicarProyectosServidor()
+};
 async function loadProjects() {
     await initDB();
+    await loadSettings(); // Ajustes globales antes del primer render
+    syncSettingsFromServer(); // En segundo plano: adopta los del servidor si son más nuevos
     let loadedProjects = [];
     let loadedFromServer = false;
 
@@ -415,6 +1031,28 @@ async function loadProjects() {
             // si se quisiera mantener la consistencia, similar a los comentarios.
             // Por ahora, lo dejamos como está para no introducir más cambios.
         }
+
+        // Migración a IDs estables: todo proyecto e ítem debe tener un `id`
+        // único y persistente (antes se usaban índices de array, frágiles al
+        // reordenar/eliminar). Solo añade IDs donde faltan: no rompe datos.
+        const ensureIds = (arr) => {
+            if (!Array.isArray(arr)) return false;
+            let changed = false;
+            const seen = new Set();
+            arr.forEach(item => {
+                if (item && typeof item === 'object') {
+                    if (!item.id || seen.has(item.id)) {
+                        item.id = generateId();
+                        changed = true;
+                    }
+                    seen.add(item.id);
+                }
+            });
+            return changed;
+        };
+        ['chapters', 'characters', 'places', 'objects'].forEach(cat => {
+            if (ensureIds(p[cat])) needsSaveToDb = true;
+        });
 
         if (p.chapters) p.chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
         return p;
@@ -538,8 +1176,8 @@ function renderProjectDetails() {
 
   dom.totalImages.textContent = imageCount;
 
-  // Renderizar Galería Rápida
-  const recentImages = allImageItems.slice(-8).reverse(); // Últimas 8 imágenes, en orden de más reciente
+  // Renderizar Galería Rápida (cantidad configurable en pestaña Config)
+  const recentImages = allImageItems.slice(-getSettings().general.galleryCount).reverse();
   dom.quickGallery.innerHTML = '';
   if (recentImages.length === 0) {
       dom.quickGallery.innerHTML = '<p class="text-gray-500 col-span-full text-center">No hay imágenes en el proyecto aún.</p>';
@@ -565,11 +1203,11 @@ function renderProjectDetails() {
           container.innerHTML = `<p class="text-gray-500 col-span-full text-center">No hay ${type} en el proyecto.</p>`;
           return;
       }
-      // Seleccionar hasta 6 elementos aleatorios
+      // Seleccionar elementos aleatorios (cantidad configurable en pestaña Config)
       const randomItems = [...items]
           .map((item, index) => ({ ...item, originalIndex: index })) // Guardar índice original
           .sort(() => 0.5 - Math.random()) // Mezclar
-          .slice(0, 6); // Tomar los primeros 6
+          .slice(0, getSettings().general.featuredCount);
 
       randomItems.forEach(item => {
           const itemCard = document.createElement('div');
@@ -793,7 +1431,7 @@ function renderProjectDetails() {
       let ratingCount = 0;
       items.forEach(item => {
         if (item.ratings && item.ratings.length > 0) {
-            totalRating += item.ratings.reduce((sum, r) => sum + (r.rating || 0), 0);
+            totalRating += item.ratings.reduce((sum, r) => sum + (typeof r === 'number' ? r : (r.rating || 0)), 0);
             ratingCount += item.ratings.length;
         }
       });
@@ -1957,8 +2595,8 @@ async function verProyectoPublico() {
     // Primero, nos aseguramos de que todos los cambios estén guardados en la BD.
     await saveProjects();
 
-    // Abrimos story.html en una nueva pestaña, pasándole el ID del proyecto.
-    const url = `story.html?projectId=${project.id}`;
+    // Abrimos la vista pública en una nueva pestaña, pasándole el ID del proyecto.
+    const url = `Xlerion-Total-Darkness.html?projectId=${project.id}`;
     window.open(url, '_blank');
 }
 
@@ -1987,12 +2625,17 @@ async function publicarProyectosServidor() {
         }
 
         // 2. Enviar los datos al servidor usando fetch POST.
+        // Se incluye el tema/diseño para que la página pública lo aplique.
+        const gs = getSettings();
         const response = await fetch('publish.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(projectsToExport),
+            body: JSON.stringify({
+                projects: projectsToExport,
+                theme: { siteName: gs.general.siteName, theme: gs.theme }
+            }),
         });
 
         if (!response.ok) {
@@ -2264,6 +2907,7 @@ function openModal(type, index = null) {
     dom.modalTitle.textContent = 'Nuevo ' + type.slice(0, -1);
   }
 
+  applyAISettingsToUI(); // Servicio por defecto y visibilidad según Config
   dom.genericModal.classList.add('show');
 }
 
@@ -2327,10 +2971,15 @@ if (dom.genericForm) {
     }
 
     if (appState.modalItemIndex !== null) {
-      // Editar
+      // Editar: conservar id y metadatos (ratings) para no romper enlaces,
+      // mapa mental ni comentarios asociados al ítem.
+      const prev = project[appState.modalType][appState.modalItemIndex] || {};
+      if (prev.id) newItem.id = prev.id;
+      if (prev.ratings) newItem.ratings = prev.ratings;
       project[appState.modalType][appState.modalItemIndex] = newItem;
     } else {
-      // Nuevo
+      // Nuevo: asignar id estable.
+      newItem.id = generateId();
       project[appState.modalType].push(newItem);
     }
 
@@ -2555,6 +3204,7 @@ if (dom.btnOpenCoverGenerator) {
             dom.coverPreviewInModal.innerHTML = `<i class="fas fa-image text-4xl"></i>`;
         }
 
+        applyAISettingsToUI(); // Servicio por defecto según Config
         dom.coverGeneratorModal.classList.add('show');
     };
 }
@@ -2579,32 +3229,17 @@ if (dom.btnGenerateProjectCover) {
         const style = dom.coverImageStyle.value;
         const service = dom.coverImageService.value;
 
-        // Definir prompts para cada estilo de portada
-        const coverStylePrompts = {
-            'default': 'dark fantasy, epic book cover, cinematic digital art, high detail, trending on artstation',
-            'futuristic': 'sci-fi book cover, futuristic, cyberpunk, neon lights, advanced technology, cinematic',
-            'modern': 'modern thriller book cover, realistic, 4k photo, contemporary, cinematic lighting',
-            'vintage': 'vintage book cover, old photo, retro style, sepia tones, film grain',
-            'surreal': 'surrealist book cover, abstract, dreamlike, bizarre, imaginative',
-            'minimalist': 'minimalist book cover, clean, simple, vector art, plain background',
-            'steampunk': 'steampunk book cover, gears, cogs, brass, victorian, intricate machinery',
-            'blueprint': 'technical blueprint book cover, schematic, grid lines, clean, architectural plan'
-        };
-        const selectedStylePrompt = coverStylePrompts[style] || coverStylePrompts['default'];
+        // Estilos de portada configurables desde la pestaña Config
+        const selectedStylePrompt = getStylePrompt('cover', style);
 
         dom.btnGenerateProjectCoverText.textContent = 'Generando...';
         dom.projectCoverSpinner.classList.remove('hidden');
         dom.btnGenerateProjectCover.disabled = true;
 
         try {
-            const prompt = `for a story titled "${project.name}", the story is about: ${summary.split(' ').slice(0, 40).join(' ')}, style: ${selectedStylePrompt}, variation ${Math.random()}`;
-            let imageUrl;
-            if (service === 'stablediffusion') {
-                imageUrl = `https://incredibly-fast-image-processing.workers.dev/generate?prompt=${encodeURIComponent(prompt)}`;
-            } else {
-                imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
-            }
-            const base64data = await urlToBase64(imageUrl);
+            const words = getSettings().ai.coverWords;
+            const prompt = `for a story titled "${project.name}", the story is about: ${summary.split(' ').slice(0, words).join(' ')}, style: ${selectedStylePrompt}${aiVariationSuffix()}${aiGlobalSuffix()}`;
+            const base64data = await aiImageToBase64(service, 'cover', prompt);
 
             project.coverImage = base64data;
             await saveProjects();
@@ -2666,48 +3301,25 @@ if (dom.btnGenerateMap) {
             const style = dom.inputMapStyle.value;
             const service = dom.inputMapService.value;
 
-            // Construir un prompt detallado y dinámico
+            // Construir un prompt detallado y dinámico (longitud configurable)
+            const mapWords = getSettings().ai.mapWords;
             let prompt = `map of ${typeText}, ${name}`;
-            if (atmosphere) prompt += `, ${atmosphere.split(' ').slice(0, 5).join(' ')}`;
-            if (keyFeatures) prompt += `, features: ${keyFeatures.split(' ').slice(0, 8).join(' ')}`;
-            if (description) prompt += `, ${description.split(' ').slice(0, 10).join(' ')}`;
+            if (atmosphere) prompt += `, ${atmosphere.split(' ').slice(0, mapWords).join(' ')}`;
+            if (keyFeatures) prompt += `, features: ${keyFeatures.split(' ').slice(0, mapWords).join(' ')}`;
+            if (description) prompt += `, ${description.split(' ').slice(0, mapWords).join(' ')}`;
 
-            // Lógica de estilos de mapa
-            const mapStylePrompts = {
-                'satellite': 'realistic top-down satellite view, high-resolution, no text labels, epic',
-                'fantasy': 'fantasy map, hand-drawn style, detailed, cartography, Tolkien style, no text',
-                'blueprint': 'blueprint schematic, technical drawing, grid lines, clean, architectural plan',
-                'ancient': 'ancient parchment map, old paper texture, compass rose, sea monsters, sepia tones',
-                'cyberpunk': 'cyberpunk city map, neon grid, holographic, futuristic, glowing lines'
-            };
-            const selectedStylePrompt = mapStylePrompts[style] || mapStylePrompts['satellite'];
-            prompt += `, ${selectedStylePrompt}`;
-            
-            // Añadir un elemento aleatorio para evitar obtener la misma imagen
-            prompt += ` seed: ${Math.random()}`;
+            // Estilos de mapa configurables desde la pestaña Config
+            prompt += `, ${getStylePrompt('map', style)}`;
 
-            let imageUrl;
-            if (service === 'stablediffusion') { // Corregido el typo 'stablediffusions'
-                imageUrl = `https://incredibly-fast-image-processing.workers.dev/generate?prompt=${encodeURIComponent(prompt)}`;
-            } else {
-                imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
-            }
+            // Elemento aleatorio para evitar obtener la misma imagen (configurable)
+            prompt += aiVariationSuffix('seed');
+            prompt += aiGlobalSuffix();
 
-            // Para poder guardarlo en base64, necesitamos buscar la imagen y convertirla.
-            const response = await fetch(imageUrl);
-            if (!response.ok) {
-                throw new Error(`La API de generación de imágenes devolvió un error: ${response.statusText}`);
-            }
-            const imageBlob = await response.blob();
-
-            const reader = new FileReader();
-            reader.readAsDataURL(imageBlob);
-            reader.onloadend = () => {
-                const base64data = reader.result;
-                appState.currentMapDataBase64 = base64data;
-                dom.mapPreview.innerHTML = `<img src="${base64data}" class="w-full h-full object-cover rounded-lg">`;
-                updateMapPreviewUI(true);
-            };
+            // Para poder guardarlo en base64, generamos y convertimos (GET o POST según proveedor).
+            const base64data = await aiImageToBase64(service, 'map', prompt);
+            appState.currentMapDataBase64 = base64data;
+            dom.mapPreview.innerHTML = `<img src="${base64data}" class="w-full h-full object-cover rounded-lg">`;
+            updateMapPreviewUI(true);
         } catch (error) {
             console.error('Error al generar el mapa:', error);
             alert(`Hubo un error al generar el mapa: ${error.message}. Por favor, inténtalo de nuevo.`);
@@ -2731,58 +3343,41 @@ if (dom.btnGenerateImage) {
         const style = dom.inputImageStyle.value;
         const service = dom.inputImageService.value;
 
-        // Definir prompts para cada estilo
-        const stylePrompts = {
-            'default': 'dark fantasy, epic digital art',
-            'futuristic': 'futuristic, sci-fi, cyberpunk, neon lights, advanced technology, cinematic',
-            'modern': 'modern, realistic, 4k photo, contemporary, cinematic lighting',
-            'vintage': 'vintage, old photo, retro style, sepia tones, film grain',
-            'dynamic': 'dynamic action shot, motion blur, cinematic, intense',
-            'surreal': 'surreal, abstract, dreamlike, bizarre, imaginative',
-            'blueprint': 'blueprint schematic, technical drawing, grid lines, clean, architectural plan',
-            'minimalist': 'minimalist, clean, simple, vector art, plain background',
-            'biological': 'biological, organic, cellular structures, microscopic view, anatomical, vibrant, detailed',
-            'chemical': 'chemical reaction, abstract, molecular, flowing liquids, vibrant colors, scientific illustration',
-            'steampunk': 'steampunk, gears, cogs, brass, victorian, intricate machinery, detailed'
-        };
-        const selectedStylePrompt = stylePrompts[style] || stylePrompts['default'];
+        // Estilos de imagen configurables desde la pestaña Config
+        const selectedStylePrompt = getStylePrompt('image', style);
+        const itemWords = getSettings().ai.itemWords;
 
         // Construir el prompt basado en el tipo de ítem
         switch (appState.modalType) {
             case 'chapters':
-                prompt = `chapter cover, title "${name}", ${description.split(' ').slice(0, 15).join(' ')}, evocative, mysterious, ${selectedStylePrompt}`;
+                prompt = `chapter cover, title "${name}", ${description.split(' ').slice(0, itemWords).join(' ')}, evocative, mysterious, ${selectedStylePrompt}`;
                 break;
             case 'characters':
                 const age = dom.inputAge.value;
                 const gender = dom.inputGender.value;
                 const physical = dom.inputPhysicalDescription.value;
-                prompt = `character portrait, ${name}, ${age || 'age not specified'}, ${gender}, physical description: ${physical.split(' ').slice(0, 20).join(' ')}, detailed, concept art, ${selectedStylePrompt}`;
+                prompt = `character portrait, ${name}, ${age || 'age not specified'}, ${gender}, physical description: ${physical.split(' ').slice(0, itemWords).join(' ')}, detailed, concept art, ${selectedStylePrompt}`;
                 break;
             case 'objects':
                 const objectType = dom.inputObjectType.value;
                 const origin = dom.inputObjectOrigin.value;
-                prompt = `object illustration, ${name}, type: ${objectType}, origin: ${origin.split(' ').slice(0, 10).join(' ')}, description: ${description.split(' ').slice(0, 15).join(' ')}, detailed, AAA video game item, ${selectedStylePrompt}`;
+                prompt = `object illustration, ${name}, type: ${objectType}, origin: ${origin.split(' ').slice(0, itemWords).join(' ')}, description: ${description.split(' ').slice(0, itemWords).join(' ')}, detailed, AAA video game item, ${selectedStylePrompt}`;
                 break;
             default:
                 alert("La generación de imágenes no está soportada para este tipo de elemento.");
                 return;
         }
 
-        // Añadir un elemento aleatorio para evitar obtener la misma imagen y evitar caché
-        prompt += `, variation ${Math.random().toString(36).substring(7)}`;
+        // Variación aleatoria anti-caché + sufijo global (configurables)
+        prompt += aiVariationSuffix();
+        prompt += aiGlobalSuffix();
 
         dom.btnGenerateImageText.textContent = 'Generando...';
         dom.imageSpinner.classList.remove('hidden');
         dom.btnGenerateImage.disabled = true;
 
         try {
-            let imageUrl;
-            if (service === 'stablediffusion') {
-                imageUrl = `https://incredibly-fast-image-processing.workers.dev/generate?prompt=${encodeURIComponent(prompt)}`;
-            } else {
-                imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
-            }
-            const base64data = await urlToBase64(imageUrl);
+            const base64data = await aiImageToBase64(service, 'image', prompt);
             appState.currentImageDataBase64 = base64data;
             dom.imagePreview.innerHTML = `<img src="${base64data}" class="w-full h-full object-cover" alt="Vista previa generada">`;
             dom.btnDeleteImage.classList.remove('hidden');
@@ -3322,6 +3917,13 @@ function openTab(tabName) {
         renderRatingsManagement();
     }
 
+    // 8. Panel de configuración global del CMS
+    if (tabName === 'config') {
+        if (window.xlerionConfigPanel && typeof window.xlerionConfigPanel.render === 'function') {
+            window.xlerionConfigPanel.render();
+        }
+    }
+
     // 5. Actualizar UI del dropdown móvil
     if (dom.tabsToggle && dom.currentTabName && dom.tabsNav) {
         const activeButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
@@ -3672,7 +4274,7 @@ window.addEventListener('resize', () => {
 
 // --- Listener para sincronización entre pestañas ---
 window.addEventListener('storage', (event) => {
-    // Si otra pestaña (story.html) actualiza las calificaciones, recargamos los datos.
+    // Si otra pestaña (vista pública) actualiza las calificaciones, recargamos los datos.
     if (event.key === 'xlerion-story-creator-update' && event.newValue) {
         refreshCurrentProjectData();
     }

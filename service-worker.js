@@ -1,79 +1,97 @@
-const CACHE_NAME = 'xlerion-story-creator-v1';
-// Lista de archivos locales esenciales para que la aplicación funcione sin conexión.
+const CACHE_NAME = 'xlerion-story-creator-v5';
+// Archivos locales esenciales (app shell). data.json se maneja con
+// estrategia network-first más abajo para no servir datos obsoletos.
 const urlsToCache = [
   'index.html',
-  'story.html',
+  'Xlerion-Total-Darkness.html',
   'app.js',
-  'story.js',
-  'data.js',
+  'historia.js',
+  'config-panel.js',
+  'enhancements.js',
+  'manifest.json',
   'favicon.ico',
   'icons/icon-192x192.png',
   'icons/icon-512x512.png',
-  './' // Cachear la URL del directorio raíz es importante para la navegación inicial.
-  // Los recursos externos (CDN) se cachearán dinámicamente para mayor robustez.
+  './'
 ];
 
-// Evento de instalación: se abre el caché y se añaden los archivos principales.
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Service Worker: Cache abierto y listo para precargar archivos.');
-        return cache.addAll(urlsToCache);
-      })
+      .then(cache => cache.addAll(urlsToCache).catch(err => {
+        console.warn('Service Worker: algunos archivos no se pudieron precargar:', err);
+      }))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Evento de activación: se limpia el caché antiguo para mantener la app actualizada.
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
+    caches.keys()
+      .then(cacheNames => Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
             console.log('Service Worker: Eliminando caché antiguo:', cacheName);
             return caches.delete(cacheName);
           }
         })
-      );
-    })
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// Evento fetch: intercepta las peticiones de red.
-// Estrategia: Cache First (primero busca en caché, si no, va a la red).
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // 1. Si el recurso está en el caché, lo devolvemos directamente.
-        if (response) {
-          return response;
-        }
+  const { request } = event;
+  if (request.method !== 'GET') {
+    return;
+  }
+  const url = new URL(request.url);
 
-        // 2. Si no está en caché, hacemos la petición a la red.
-        return fetch(event.request).then(
-          networkResponse => {
-            // 3. Si la petición a la red falla o devuelve un error, simplemente devolvemos la respuesta de error.
-            if (!networkResponse || networkResponse.status !== 200) {
-              return networkResponse;
-            }
-
-            // 4. Si la petición es exitosa, clonamos la respuesta.
-            // Una respuesta solo se puede consumir una vez. Necesitamos una copia para el caché y otra para el navegador.
-            const responseToCache = networkResponse.clone();
-
-            // 5. Abrimos el caché y guardamos la nueva respuesta para futuras peticiones.
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-
-            // 6. Devolvemos la respuesta original al navegador.
-            return networkResponse;
+  // data.json y theme.json: network-first (datos frescos), con fallback a caché.
+  if (url.pathname.endsWith('/data.json') || url.pathname.endsWith('data.json') ||
+      url.pathname.endsWith('/theme.json') || url.pathname.endsWith('theme.json')) {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' })
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
           }
-        );
-      })
+          return networkResponse;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Resto: cache-first con actualización en segundo plano.
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) {
+        return cached;
+      }
+      return fetch(request).then(networkResponse => {
+        if (!networkResponse || networkResponse.status !== 200) {
+          return networkResponse;
+        }
+        // Solo cachear recursos same-origin o con CORS válido.
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          try {
+            cache.put(request, responseToCache);
+          } catch (e) {
+            // p. ej. opaque responses o esquemas no soportados: ignorar.
+          }
+        });
+        return networkResponse;
+      }).catch(() => {
+        // Fallback offline para navegaciones.
+        if (request.mode === 'navigate') {
+          return caches.match('index.html');
+        }
+        return undefined;
+      });
+    })
   );
 });

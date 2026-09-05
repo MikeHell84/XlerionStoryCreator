@@ -12,5 +12,14 @@
  yarn-debug.log*
  yarn-error.log*
  
- # Dependencias (si las usaras en el futuro)
- /node_modules
+# Dependencias (si las usaras en el futuro)
+  /node_modules
+
+# Configuración local con secretos (ver config.example.php)
+config.php
+.env
+settings.json
+
+# Backups automáticos generados por publish.php / update.php
+/backups/
+*.tmp

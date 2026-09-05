@@ -1,8 +1,14 @@
  # Cargar index.html por defecto
  DirectoryIndex index.html
  
- # Desactivar el listado de archivos y carpetas para mayor seguridad
- Options -Indexes
+  # Desactivar el listado de archivos y carpetas para mayor seguridad
+  Options -Indexes
+
+  # --- BLOQUEAR ARCHIVOS SENSIBLES (credenciales, config, backups) ---
+  <FilesMatch "^(\\.env|config\\.php|settings\\.json|.*\\.tmp|.*\\.log)$">
+    Require all denied
+  </FilesMatch>
+  RedirectMatch 404 ^/backups/.*$
  
  # --- POLÍTICAS DE CACHÉ MODERNAS ---
  # Eliminar el header Pragma obsoleto que causa la advertencia.
@@ -23,13 +29,13 @@
  # Esto permite que tu aplicación cargue todos los recursos necesarios y use 'unsafe-eval'
  # para librerías que lo requieran.
  # ADVERTENCIA: 'unsafe-eval' reduce la seguridad contra inyecciones de script.
- Header set Content-Security-Policy "default-src 'none'; \
- base-uri 'self'; \
- form-action 'self'; \
- frame-ancestors 'none'; \
- manifest-src 'self'; \
- img-src 'self' data: https://placehold.co; \
- font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; \
- style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://unpkg.com; \
- script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net https://www.gstatic.com; \
- connect-src 'self' https://www.googleapis.com https://securetoken.googleapis.com;"
+  Header set Content-Security-Policy "default-src 'none'; \
+  base-uri 'self'; \
+  form-action 'self'; \
+  frame-ancestors 'none'; \
+  manifest-src 'self'; \
+  img-src 'self' data: blob: https://placehold.co https://image.pollinations.ai; \
+  font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; \
+  style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://unpkg.com; \
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net https://www.gstatic.com; \
+  connect-src 'self' https://www.googleapis.com https://securetoken.googleapis.com https://image.pollinations.ai;"
