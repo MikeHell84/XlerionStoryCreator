@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xlerion-story-creator-v5';
+const CACHE_NAME = 'xlerion-story-creator-v6';
 // Archivos locales esenciales (app shell). data.json se maneja con
 // estrategia network-first más abajo para no servir datos obsoletos.
 const urlsToCache = [
@@ -12,6 +12,8 @@ const urlsToCache = [
   'favicon.ico',
   'icons/icon-192x192.png',
   'icons/icon-512x512.png',
+  'icons/apple-touch-icon.png',
+  'icons/favicon-32x32.png',
   './'
 ];
 
