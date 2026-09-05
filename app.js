@@ -7,7 +7,10 @@ import {
     createUserWithEmailAndPassword,
     signOut,
     GoogleAuthProvider,
-    signInWithPopup
+    signInWithPopup,
+    setPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
 // --- PASO 1: CONFIGURACIÓN DE FIREBASE (ACCIÓN REQUERIDA) ---
@@ -132,7 +135,13 @@ async function handleLocalLogin() {
     const email = (emailInput.value || '').trim().toLowerCase();
     const hash = await sha256Hex(passwordInput.value || '');
     if (email === LOCAL_ADMIN.email && hash === LOCAL_ADMIN.passHash) {
-        try { sessionStorage.setItem(LOCAL_SESSION_KEY, '1'); } catch (e) {}
+        // "Mantener sesión" = localStorage (sobrevive reinicios del navegador);
+        // sin marcar = sessionStorage (solo la pestaña abierta).
+        const remember = document.getElementById('remember-me')?.checked !== false;
+        try {
+            (remember ? localStorage : sessionStorage).setItem(LOCAL_SESSION_KEY, '1');
+            (remember ? sessionStorage : localStorage).removeItem(LOCAL_SESSION_KEY);
+        } catch (e) {}
         enterLocalAdmin();
     } else {
         errorMessage.textContent = 'Credenciales incorrectas.';
@@ -201,6 +210,12 @@ async function handleLogin(event) {
     const errorMessage = document.getElementById('login-error-message');
 
     try {
+        // "Mantener sesión" = persistencia local (sobrevive reinicios);
+        // sin marcar = solo dura la pestaña abierta.
+        const remember = document.getElementById('remember-me')?.checked !== false;
+        try {
+            await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+        } catch (e) { /* persistencia no crítica */ }
         await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
         // onAuthStateChanged se encargará de mostrar la app
     } catch (error) {
@@ -244,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-button');
     if (logoutButton) {
         logoutButton.addEventListener('click', async () => {
-            try { sessionStorage.removeItem(LOCAL_SESSION_KEY); } catch (e) {}
+            try { sessionStorage.removeItem(LOCAL_SESSION_KEY); localStorage.removeItem(LOCAL_SESSION_KEY); } catch (e) {}
             if (auth) {
                 // La función signOut de Firebase es la que cierra la sesión
                 try { await signOut(auth); } catch (e) { console.error(e); }
@@ -259,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Modo local: restaurar sesión y mostrar aviso discreto
     if (!isFirebaseConfigured || !auth) {
         try {
-            if (sessionStorage.getItem(LOCAL_SESSION_KEY) === '1') {
+            if (localStorage.getItem(LOCAL_SESSION_KEY) === '1' || sessionStorage.getItem(LOCAL_SESSION_KEY) === '1') {
                 enterLocalAdmin();
             }
         } catch (e) {}
