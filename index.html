@@ -7,6 +7,9 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1A1A1A">
   <meta name="description" content="Crea y gestiona tus mundos e historias interactivas.">
+  <meta name="language" content="Spanish">
+  <meta property="og:locale" content="es_ES">
+  <meta name="google" content="translate">
   <!-- Compatibilidad con iOS -->
   <link rel="apple-touch-icon" href="icons/icon-192x192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,6 +24,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
   <!-- Librerías para el Mapa Mental -->
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
@@ -268,6 +273,10 @@
                   </div>
               </div>
               <p id="login-error-message" class="text-red-400 text-sm text-center hidden"></p>
+              <label class="flex items-center justify-center gap-2 text-sm text-gray-400 cursor-pointer select-none">
+                <input id="remember-me" type="checkbox" checked class="w-4 h-4 accent-indigo-500">
+                Mantener sesión iniciada en este equipo
+              </label>
               <div class="flex flex-col space-y-4">
                   <button id="login-button" type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-800">
                       Entrar
