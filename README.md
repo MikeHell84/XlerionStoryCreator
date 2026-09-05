@@ -139,6 +139,6 @@ El token también puede guardarse desde el panel (Config → Publicación); nunc
 ## Licencia y autoría
 
 Desarrollado por **XLERION STUDIOS — COLOMBIA**.
-Contacto: [contactus@xlerion.com](mailto:contactus@xlerion.com) · [Twitter](https://twitter.com/XlerionUltimate) · [LinkedIn](https://www.linkedin.com/company/xlerion) · [Patreon](https://www.patreon.com/c/xlerion)
+Contacto: [contactus@xlerion.com](mailto:contactus@xlerion.com) · [Twitter](https://twitter.com/XlerionUltimate) · [LinkedIn](https://www.linkedin.com/in/miguelrodriguez-dataviz/) · [Patreon](https://www.patreon.com/c/xlerion)
 
 ¿Te gusta el proyecto? Explora la historia en vivo: **[Total Darkness](https://miguelxlerion.github.io/XlerionStoryCreator/Xlerion-Total-Darkness.html)**.
